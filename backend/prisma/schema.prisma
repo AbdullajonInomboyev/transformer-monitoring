@@ -1,0 +1,442 @@
+// ============================================
+// TRANSFORMATOR MONITORING TIZIMI
+// Ma'lumotlar bazasi sxemasi (Prisma ORM)
+// Davlat miqyosidagi loyiha
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// FOYDALANUVCHILAR VA AUTENTIFIKATSIYA
+// ============================================
+
+enum UserRole {
+  ADMIN       // To'liq boshqaruv
+  EMPLOYEE    // Hudud bo'yicha CRUD
+  INSPECTOR   // Vaqtincha faqat ko'rish
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  phone         String?
+  role          UserRole  @default(EMPLOYEE)
+  
+  // Hodim qaysi hududga biriktirilgan
+  regionId      String?   @map("region_id")
+  region        Region?   @relation(fields: [regionId], references: [id])
+  
+  // Tekshiruvchi uchun muddatli kirish
+  expiresAt     DateTime? @map("expires_at")
+  
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  // Bog'lanishlar
+  createdTransformers   Transformer[]   @relation("CreatedBy")
+  performedMaintenance  Maintenance[]   @relation("PerformedBy")
+  conductedInspections  Inspection[]    @relation("InspectorRel")
+  reportedIncidents     Incident[]      @relation("ReportedBy")
+  resolvedAlerts        Alert[]         @relation("ResolvedBy")
+  assignedWorkOrders    WorkOrder[]     @relation("AssignedTo")
+  auditLogs             AuditLog[]
+  refreshTokens         RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("refresh_tokens")
+}
+
+// ============================================
+// HUDUDLAR (Viloyatlar va Tumanlar)
+// ============================================
+
+model Region {
+  id          String   @id @default(uuid())
+  name        String   // Toshkent, Namangan, ...
+  nameRu      String?  @map("name_ru")
+  nameEn      String?  @map("name_en")
+  code        String   @unique // TK, NM, SM, ...
+  population  Int      @default(0)
+  areaKm2     Float    @default(0) @map("area_km2")
+  description String?
+  
+  // Xaritada hudud chegarasi (GeoJSON Polygon)
+  polygonCoords Json?  @map("polygon_coords")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Bog'lanishlar
+  districts     District[]
+  substations   Substation[]
+  transformers  Transformer[]
+  users         User[]
+
+  @@map("regions")
+}
+
+model District {
+  id          String   @id @default(uuid())
+  name        String
+  nameRu      String?  @map("name_ru")
+  nameEn      String?  @map("name_en")
+  code        String   @unique // TK-BE, TK-MI, ...
+  
+  regionId    String   @map("region_id")
+  region      Region   @relation(fields: [regionId], references: [id])
+  
+  population  Int      @default(0)
+  areaKm2     Float    @default(0) @map("area_km2")
+  description String?
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Bog'lanishlar
+  substations   Substation[]
+  transformers  Transformer[]
+
+  @@map("districts")
+}
+
+// ============================================
+// PODSTANSIYALAR
+// ============================================
+
+model Substation {
+  id                String    @id @default(uuid())
+  name              String
+  code              String    @unique
+  
+  regionId          String    @map("region_id")
+  region            Region    @relation(fields: [regionId], references: [id])
+  
+  districtId        String?   @map("district_id")
+  district          District? @relation(fields: [districtId], references: [id])
+  
+  latitude          Float?
+  longitude         Float?
+  address           String?
+  photoUrl          String?   @map("photo_url")
+  commissionedDate  DateTime? @map("commissioned_date")
+  notes             String?
+  
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  
+  // Bog'lanishlar
+  transformers      Transformer[]
+
+  @@map("substations")
+}
+
+// ============================================
+// TRANSFORMATORLAR (Asosiy entitet)
+// ============================================
+
+enum TransformerStatus {
+  OPERATIONAL
+  WARNING
+  CRITICAL
+  OFFLINE
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Transformer {
+  id                  String             @id @default(uuid())
+  inventoryNumber     String             @unique @map("inventory_number")
+  model               String?
+  manufacturer        String?
+  
+  // Joylashuv bog'lanishlari
+  substationId        String?            @map("substation_id")
+  substation          Substation?        @relation(fields: [substationId], references: [id])
+  
+  regionId            String             @map("region_id")
+  region              Region             @relation(fields: [regionId], references: [id])
+  
+  districtId          String?            @map("district_id")
+  district            District?          @relation(fields: [districtId], references: [id])
+  
+  // GPS koordinatalari
+  latitude            Float
+  longitude           Float
+  address             String?
+  
+  // Texnik xususiyatlar
+  capacityKva         Int                @map("capacity_kva")
+  manufactureYear     Int?               @map("manufacture_year")
+  installationDate    DateTime?          @map("installation_date")
+  
+  // Aholi va ist'molchilar
+  connectedHouseholds Int                @default(0) @map("connected_households")
+  estimatedPopulation Int                @default(0) @map("estimated_population")
+  areaType            String?            @map("area_type") // Turar joy, Sanoat, Savdo, ...
+  
+  // Monitoring ko'rsatkichlari
+  healthScore         Float              @default(100) @map("health_score")
+  riskLevel           RiskLevel          @default(LOW) @map("risk_level")
+  status              TransformerStatus  @default(OPERATIONAL)
+  isOnline            Boolean            @default(false) @map("is_online")
+  loadPercent         Float              @default(0) @map("load_percent")
+  
+  // Media va izohlar
+  photoUrl            String?            @map("photo_url")
+  photos              Json?              // Bir nechta rasm URL lari
+  notes               String?
+  
+  // Kim yaratgan
+  createdById         String?            @map("created_by_id")
+  createdBy           User?              @relation("CreatedBy", fields: [createdById], references: [id])
+  
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  
+  // Bog'lanishlar
+  alerts              Alert[]
+  maintenance         Maintenance[]
+  inspections         Inspection[]
+  incidents           Incident[]
+  workOrders          WorkOrder[]
+
+  @@index([regionId])
+  @@index([districtId])
+  @@index([status])
+  @@index([latitude, longitude])
+  @@map("transformers")
+}
+
+// ============================================
+// OGOHLANTIRISH TIZIMI
+// ============================================
+
+enum AlertPriority {
+  ACTIVE
+  CRITICAL
+  EMERGENCY
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Alert {
+  id              String        @id @default(uuid())
+  
+  transformerId   String        @map("transformer_id")
+  transformer     Transformer   @relation(fields: [transformerId], references: [id])
+  
+  priority        AlertPriority
+  title           String
+  description     String?
+  status          AlertStatus   @default(OPEN)
+  
+  resolvedAt      DateTime?     @map("resolved_at")
+  resolvedById    String?       @map("resolved_by_id")
+  resolvedBy      User?         @relation("ResolvedBy", fields: [resolvedById], references: [id])
+  
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([transformerId])
+  @@index([status])
+  @@index([priority])
+  @@map("alerts")
+}
+
+// ============================================
+// TEXNIK XIZMAT KO'RSATISH
+// ============================================
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Maintenance {
+  id              String            @id @default(uuid())
+  
+  transformerId   String            @map("transformer_id")
+  transformer     Transformer       @relation(fields: [transformerId], references: [id])
+  
+  workType        String            @map("work_type")
+  description     String?
+  scheduledDate   DateTime?         @map("scheduled_date")
+  completedDate   DateTime?         @map("completed_date")
+  
+  performedById   String?           @map("performed_by_id")
+  performedBy     User?             @relation("PerformedBy", fields: [performedById], references: [id])
+  
+  status          MaintenanceStatus @default(SCHEDULED)
+  cost            Float?
+  
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@index([transformerId])
+  @@map("maintenance_records")
+}
+
+// ============================================
+// TEKSHIRUVLAR (Inspections)
+// ============================================
+
+enum InspectionResult {
+  PASS
+  FAIL
+  NEEDS_REPAIR
+}
+
+model Inspection {
+  id              String           @id @default(uuid())
+  
+  transformerId   String           @map("transformer_id")
+  transformer     Transformer      @relation(fields: [transformerId], references: [id])
+  
+  inspectorId     String           @map("inspector_id")
+  inspector       User             @relation("InspectorRel", fields: [inspectorId], references: [id])
+  
+  inspectionDate  DateTime         @map("inspection_date")
+  checklist       Json?            // Tekshiruv ro'yxati
+  findings        String?          // Topilmalar
+  result          InspectionResult @default(PASS)
+  
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@index([transformerId])
+  @@map("inspections")
+}
+
+// ============================================
+// HODISALAR (Incidents)
+// ============================================
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Incident {
+  id            String    @id @default(uuid())
+  
+  transformerId String    @map("transformer_id")
+  transformer   Transformer @relation(fields: [transformerId], references: [id])
+  
+  incidentType  String    @map("incident_type")
+  description   String?
+  occurredAt    DateTime  @map("occurred_at")
+  severity      Severity  @default(LOW)
+  
+  reportedById  String?   @map("reported_by_id")
+  reportedBy    User?     @relation("ReportedBy", fields: [reportedById], references: [id])
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([transformerId])
+  @@map("incidents")
+}
+
+// ============================================
+// ISH BUYURTMALARI (Work Orders)
+// ============================================
+
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model WorkOrder {
+  id              String            @id @default(uuid())
+  
+  transformerId   String            @map("transformer_id")
+  transformer     Transformer       @relation(fields: [transformerId], references: [id])
+  
+  title           String
+  description     String?
+  
+  assignedToId    String?           @map("assigned_to_id")
+  assignedTo      User?             @relation("AssignedTo", fields: [assignedToId], references: [id])
+  
+  dueDate         DateTime?         @map("due_date")
+  status          WorkOrderStatus   @default(OPEN)
+  priority        WorkOrderPriority @default(MEDIUM)
+  
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@index([transformerId])
+  @@index([status])
+  @@map("work_orders")
+}
+
+// ============================================
+// AUDIT LOG (Kim nima qilganini yozib borish)
+// ============================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, LOGOUT
+  entityType  String   @map("entity_type") // Transformer, Substation, ...
+  entityId    String?  @map("entity_id")
+  
+  oldValues   Json?    @map("old_values")
+  newValues   Json?    @map("new_values")
+  
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
