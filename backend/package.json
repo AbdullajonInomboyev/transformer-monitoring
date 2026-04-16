@@ -10,7 +10,7 @@
     "db:push": "npx prisma db push",
     "db:seed": "node src/seeds/seed.js",
     "db:studio": "npx prisma studio",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && prisma migrate deploy",
     "db:deploy": "prisma migrate deploy"
   },
   "dependencies": {
