@@ -14,6 +14,7 @@ import AlertsPage from '@/pages/alerts/AlertsPage';
 import MaintenancePage from '@/pages/maintenance/MaintenancePage';
 import UsersPage from '@/pages/users/UsersPage';
 import AuditPage from '@/pages/audit/AuditPage';
+import WorkPermitsPage from '@/pages/workpermits/WorkPermitsPage';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/transformers/:id" element={<TransformerDetail />} />
             <Route path="/transformers/:id/edit" element={<TransformerForm />} />
             <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/work-permits" element={<WorkPermitsPage />} />
             <Route path="/maintenance" element={<MaintenancePage />} />
 
             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>

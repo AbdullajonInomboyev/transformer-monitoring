@@ -4,6 +4,14 @@ import { transformersApi, regionsApi } from '@/api/client';
 import { useAuthStore } from '@/context/authStore';
 import { Plus, Search, Filter, Download, Upload, Trash2, Edit } from 'lucide-react';
 
+
+const photoUrl = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const base = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
+  return base ? base + url : url;
+};
+
 export default function TransformersPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -167,7 +175,7 @@ export default function TransformersPage() {
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       {t.photoUrl ? (
                         <img
-                          src={t.photoUrl}
+                          src={photoUrl(t.photoUrl)}
                           alt={t.inventoryNumber}
                           className="w-10 h-10 rounded-lg object-cover border"
                         />

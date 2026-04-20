@@ -13,6 +13,14 @@ const markerIcon = L.divIcon({
   iconAnchor: [16, 32],
 });
 
+
+const photoUrl = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const base = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
+  return base ? base + url : url;
+};
+
 export default function TransformerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -66,7 +74,7 @@ export default function TransformerDetail() {
           {data.photoUrl && (
             <div className="bg-white rounded-xl border p-6">
               <h2 className="font-semibold text-lg mb-4">Transformator surati</h2>
-              <img src={data.photoUrl} alt={data.inventoryNumber} className="max-h-96 rounded-lg mx-auto border" />
+              <img src={photoUrl(data.photoUrl)} alt={data.inventoryNumber} className="max-h-96 rounded-lg mx-auto border" />
             </div>
           )}
 
@@ -77,6 +85,7 @@ export default function TransformerDetail() {
               <Info label="Inventar raqami" value={data.inventoryNumber} />
               <Info label="Model" value={data.model} />
               <Info label="Ishlab chiqaruvchi" value={data.manufacturer} />
+              <Info label="Tarmoq nomi" value={data.networkName} />
               <Info label="Ishlab chiqarilgan yili" value={data.manufactureYear} />
               <Info label="O'rnatilgan sana" value={data.installationDate ? new Date(data.installationDate).toLocaleDateString('uz') : '—'} />
               <Info label="Hudud turi" value={data.areaType} />

@@ -22,7 +22,7 @@ export default function TransformerForm() {
   const [uploading, setUploading] = useState(false);
 
   const [form, setForm] = useState({
-    inventoryNumber: '', model: '', manufacturer: '',
+    inventoryNumber: '', model: '', manufacturer: '', networkName: '',
     regionId: user?.regionId || '', districtId: '', substationId: '',
     latitude: 41.2995, longitude: 69.2401, address: '',
     capacityKva: 100, manufactureYear: 2026,
@@ -43,7 +43,8 @@ export default function TransformerForm() {
     try {
       const res = await transformersApi.get(id!);
       const t = res.data.data;
-      setForm({ inventoryNumber: t.inventoryNumber||'', model: t.model||'', manufacturer: t.manufacturer||'',
+      setForm({ inventoryNumber: t.inventoryNumber||'', model: t.model||'', manufacturer: t.manufacturer||'', networkName: t.networkName||'',
+        networkName: t.networkName||'',
         regionId: t.regionId||'', districtId: t.districtId||'', substationId: t.substationId||'',
         latitude: t.latitude||41.2995, longitude: t.longitude||69.2401, address: t.address||'',
         capacityKva: t.capacityKva||100, manufactureYear: t.manufactureYear||2026,
@@ -51,7 +52,10 @@ export default function TransformerForm() {
         connectedHouseholds: t.connectedHouseholds||0, estimatedPopulation: t.estimatedPopulation||0,
         areaType: t.areaType||'Turar joy', status: t.status||'OPERATIONAL', healthScore: t.healthScore||95,
         notes: t.notes||'', photoUrl: t.photoUrl||'' });
-      if (t.photoUrl) setPhotoPreview(t.photoUrl);
+      if (t.photoUrl) {
+        const base = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
+        setPhotoPreview(t.photoUrl.startsWith('http') ? t.photoUrl : (base ? base + t.photoUrl : t.photoUrl));
+      }
     } catch {} finally { setLoading(false); }
   };
 
@@ -138,6 +142,7 @@ export default function TransformerForm() {
             <Sel l="Viloyat *" v={form.regionId} c={v=>update('regionId',v)} o={regions.map(r=>({v:r.id,l:r.name}))} dis={user?.role==='EMPLOYEE'} />
             <Sel l="Tuman" v={form.districtId} c={v=>update('districtId',v)} o={districts.map(d=>({v:d.id,l:d.name}))} />
             <Sel l="Podstansiya" v={form.substationId} c={v=>update('substationId',v)} o={substations.map(s=>({v:s.id,l:s.name}))} />
+            <Inp l="Tarmoq nomi" v={form.networkName} c={v=>update('networkName',v)} p="Tarmoq nomini kiriting" full />
           </div>
         </Sec>
 
