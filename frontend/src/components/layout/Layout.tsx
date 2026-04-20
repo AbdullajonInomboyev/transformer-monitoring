@@ -3,13 +3,14 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/context/authStore';
 import {
   LayoutDashboard, Map, Globe, Building2, Zap, AlertTriangle,
-  Wrench, Users, FileText, LogOut, Menu, X, ChevronDown, Bell,
+  Wrench, Users, FileText, LogOut, Menu, X, ChevronDown, Bell, ClipboardList,
 } from 'lucide-react';
 
 const navItems = [
   { path: '/dashboard', label: 'Boshqaruv paneli', icon: LayoutDashboard },
   { path: '/map', label: 'Xarita ko\'rinishi', icon: Map },
   { path: '/regions', label: 'Hududlar', icon: Globe },
+  { path: '/work-permits', label: 'Naryad-ijozat', icon: ClipboardList },
   { path: '/substations', label: 'Podstansiyalar', icon: Building2 },
   { path: '/transformers', label: 'Transformatorlar', icon: Zap },
   { path: '/alerts', label: 'Ogohlantirishlar', icon: AlertTriangle },
@@ -33,13 +34,13 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const roleLabel = {
+  const roleLabel: Record<string, string> = {
     ADMIN: 'Administrator',
     EMPLOYEE: 'Hodim',
     INSPECTOR: 'Tekshiruvchi',
   };
 
-  const roleColor = {
+  const roleColor: Record<string, string> = {
     ADMIN: 'bg-purple-100 text-purple-700',
     EMPLOYEE: 'bg-blue-100 text-blue-700',
     INSPECTOR: 'bg-amber-100 text-amber-700',
