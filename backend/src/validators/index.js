@@ -18,7 +18,7 @@ const createUserSchema = z.object({
   phone: z.string().optional(),
   role: z.enum(['ADMIN', 'EMPLOYEE', 'INSPECTOR']),
   regionId: z.string().uuid().optional().nullable(),
-  expiresAt: z.string().datetime().optional().nullable(), // Tekshiruvchi uchun
+  expiresAt: z.string().datetime().optional().nullable(),
 });
 
 const updateUserSchema = createUserSchema.partial().omit({ password: true });
@@ -34,7 +34,7 @@ const createRegionSchema = z.object({
   population: z.number().int().min(0).optional(),
   areaKm2: z.number().min(0).optional(),
   description: z.string().optional(),
-  polygonCoords: z.any().optional(), // GeoJSON
+  polygonCoords: z.any().optional(),
 });
 
 // ============================================
@@ -73,6 +73,7 @@ const createTransformerSchema = z.object({
   inventoryNumber: z.string().min(1, 'Inventar raqami talab qilinadi'),
   model: z.string().optional(),
   manufacturer: z.string().optional(),
+  networkName: z.string().optional().nullable(),
   substationId: z.string().uuid().optional().nullable(),
   regionId: z.string().uuid(),
   districtId: z.string().uuid().optional().nullable(),
@@ -90,6 +91,8 @@ const createTransformerSchema = z.object({
   status: z.enum(['OPERATIONAL', 'WARNING', 'CRITICAL', 'OFFLINE']).optional(),
   isOnline: z.boolean().optional(),
   loadPercent: z.number().min(0).max(100).optional(),
+  photoUrl: z.string().optional().nullable(),
+  photos: z.any().optional().nullable(),
   notes: z.string().optional(),
 });
 
