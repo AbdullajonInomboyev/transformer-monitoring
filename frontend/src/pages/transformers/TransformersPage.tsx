@@ -22,6 +22,7 @@ export default function TransformersPage() {
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState({ search: '', regionId: '', status: '', minKva: '', maxKva: '' });
   const [showFilters, setShowFilters] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const limit = 10;
 
   useEffect(() => { loadRegions(); }, []);
@@ -46,18 +47,28 @@ export default function TransformersPage() {
     try { await transformersApi.delete(id); loadTransformers(); } catch {}
   };
 
-  // CSV Export
-  const handleExport = () => {
-    const headers = ['Inventar №', 'Model', 'Tarmoq nomi', 'Hudud', 'Podstansiya', 'Tasarrufi', 'Aholi', 'Lat', 'Lng', 'Quvvat (kVA)', 'Status'];
-    const rows = transformers.map(t => [
-      t.inventoryNumber, t.model || '', t.networkName || '', t.region?.name || '', t.substation?.name || '',
-      t.areaType || '', t.estimatedPopulation || 0, t.latitude, t.longitude, t.capacityKva, t.status,
-    ]);
-    const csv = [headers.join(','), ...rows.map(r => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `transformatorlar_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-    URL.revokeObjectURL(url);
+  // CSV Export — BARCHA transformatorlarni yuklaydi
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // Barcha transformatorlarni olish
+      const res = await transformersApi.list({ page: 1, limit: 10000, ...filters });
+      const allData = res.data.data;
+
+      const headers = ['Inventar №', 'Model', 'Tarmoq nomi', 'Hudud', 'Podstansiya', 'Tasarrufi', 'Aholi', 'Lat', 'Lng', 'Quvvat (kVA)', 'Status'];
+      const rows = allData.map((t: any) => [
+        t.inventoryNumber || '', t.model || '', t.networkName || '', t.region?.name || '', t.substation?.name || '',
+        t.areaType || '', t.estimatedPopulation || 0, t.latitude || '', t.longitude || '', t.capacityKva || '', t.status || '',
+      ]);
+
+      // Excel uchun ; ajratgich va BOM
+      const csv = [headers.join(';'), ...rows.map((r: any) => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(';'))].join('\r\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `transformatorlar_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert('Export xatolik'); }
+    finally { setExporting(false); }
   };
 
   // CSV Import
@@ -70,10 +81,12 @@ export default function TransformersPage() {
         const text = ev.target?.result as string;
         const lines = text.split('\n').filter(l => l.trim());
         if (lines.length < 2) { alert('CSV fayl bo\'sh'); return; }
-        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+        // ; yoki , ajratgichni aniqlash
+        const sep = lines[0].includes(';') ? ';' : ',';
+        const headers = lines[0].split(sep).map(h => h.replace(/"/g, '').trim());
         let imported = 0;
         for (let i = 1; i < lines.length; i++) {
-          const vals = lines[i].match(/(".*?"|[^,]+)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
+          const vals = lines[i].split(sep).map(v => v.replace(/^"|"$/g, '').trim());
           const row: any = {};
           headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
           try {
@@ -123,8 +136,8 @@ export default function TransformersPage() {
           <p className="text-sm text-gray-500">Barcha transformatorlarni boshqarish, filtrlash va monitoring</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50">
-            <Download className="w-4 h-4" /> CSV Export
+          <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50">
+            <Download className="w-4 h-4" /> {exporting ? 'Yuklanmoqda...' : 'CSV Export'}
           </button>
           <label className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 cursor-pointer">
             <Upload className="w-4 h-4" /> CSV Import
