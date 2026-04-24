@@ -23,11 +23,10 @@ enum UserRole {
   INSPECTOR
 }
 
-// Hudud biriktirish turi
 enum AssignmentType {
-  REGION      // Butun viloyat
-  DISTRICTS   // Aniq tumanlar
-  POLYGON     // Xususiy xarita chegarasi
+  REGION
+  DISTRICTS
+  POLYGON
 }
 
 model User {
@@ -37,29 +36,24 @@ model User {
   fullName      String    @map("full_name")
   phone         String?
   role          UserRole  @default(EMPLOYEE)
-  
-  // Hudud biriktirish turi
+
   assignmentType AssignmentType? @map("assignment_type")
-  
-  // Viloyat bo'yicha biriktirish
+
   regionId      String?   @map("region_id")
   region        Region?   @relation(fields: [regionId], references: [id])
-  
-  // Tumanlar bo'yicha biriktirish (UUID array)
+
   districtIds   String[]  @default([]) @map("district_ids")
-  
-  // Xususiy poligon (GeoJSON coords array)
+
   customPolygon Json?     @map("custom_polygon")
-  
-  // Tekshiruvchi uchun muddatli kirish
+
   expiresAt     DateTime? @map("expires_at")
-  
+
   isActive      Boolean   @default(true) @map("is_active")
   lastLoginAt   DateTime? @map("last_login_at")
-  
+
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
-  
+
   createdTransformers   Transformer[]   @relation("CreatedBy")
   performedMaintenance  Maintenance[]   @relation("PerformedBy")
   conductedInspections  Inspection[]    @relation("InspectorRel")
@@ -100,7 +94,7 @@ model Region {
   polygonCoords Json?  @map("polygon_coords")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  
+
   districts     District[]
   substations   Substation[]
   transformers  Transformer[]
@@ -122,7 +116,7 @@ model District {
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  
+
   substations   Substation[]
   transformers  Transformer[]
 
@@ -134,22 +128,23 @@ model District {
 // ============================================
 
 model Substation {
-  id                String    @id @default(uuid())
-  name              String
-  code              String    @unique
-  regionId          String    @map("region_id")
-  region            Region    @relation(fields: [regionId], references: [id])
-  districtId        String?   @map("district_id")
-  district          District? @relation(fields: [districtId], references: [id])
-  latitude          Float?
-  longitude         Float?
-  address           String?
-  photoUrl          String?   @map("photo_url")
-  commissionedDate  DateTime? @map("commissioned_date")
-  notes             String?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  transformers      Transformer[]
+  id                      String    @id @default(uuid())
+  name                    String
+  code                    String
+  regionId                String    @map("region_id")
+  region                  Region    @relation(fields: [regionId], references: [id])
+  districtId              String?   @map("district_id")
+  district                District? @relation(fields: [districtId], references: [id])
+  latitude                Float?
+  longitude               Float?
+  address                 String?
+  photoUrl                String?   @map("photo_url")
+  commissionedDate        DateTime? @map("commissioned_date")
+  transformerCapacities   Json?     @map("transformer_capacities")
+  notes                   String?
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  transformers            Transformer[]
 
   @@map("substations")
 }
@@ -205,7 +200,7 @@ model Transformer {
   createdBy           User?              @relation("CreatedBy", fields: [createdById], references: [id])
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
-  
+
   alerts              Alert[]
   maintenance         Maintenance[]
   inspections         Inspection[]
@@ -224,8 +219,17 @@ model Transformer {
 // OGOHLANTIRISHLAR
 // ============================================
 
-enum AlertPriority { ACTIVE CRITICAL EMERGENCY }
-enum AlertStatus { OPEN ACKNOWLEDGED RESOLVED }
+enum AlertPriority {
+  ACTIVE
+  CRITICAL
+  EMERGENCY
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
 
 model Alert {
   id              String        @id @default(uuid())
@@ -251,7 +255,12 @@ model Alert {
 // TEXNIK XIZMAT
 // ============================================
 
-enum MaintenanceStatus { SCHEDULED IN_PROGRESS COMPLETED CANCELLED }
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
 
 model Maintenance {
   id              String            @id @default(uuid())
@@ -276,7 +285,11 @@ model Maintenance {
 // TEKSHIRUVLAR
 // ============================================
 
-enum InspectionResult { PASS FAIL NEEDS_REPAIR }
+enum InspectionResult {
+  PASS
+  FAIL
+  NEEDS_REPAIR
+}
 
 model Inspection {
   id              String           @id @default(uuid())
@@ -299,20 +312,25 @@ model Inspection {
 // HODISALAR
 // ============================================
 
-enum Severity { LOW MEDIUM HIGH CRITICAL }
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
 
 model Incident {
-  id            String    @id @default(uuid())
-  transformerId String    @map("transformer_id")
+  id            String      @id @default(uuid())
+  transformerId String      @map("transformer_id")
   transformer   Transformer @relation(fields: [transformerId], references: [id])
-  incidentType  String    @map("incident_type")
+  incidentType  String      @map("incident_type")
   description   String?
-  occurredAt    DateTime  @map("occurred_at")
-  severity      Severity  @default(LOW)
-  reportedById  String?   @map("reported_by_id")
-  reportedBy    User?     @relation("ReportedBy", fields: [reportedById], references: [id])
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  occurredAt    DateTime    @map("occurred_at")
+  severity      Severity    @default(LOW)
+  reportedById  String?     @map("reported_by_id")
+  reportedBy    User?       @relation("ReportedBy", fields: [reportedById], references: [id])
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
 
   @@index([transformerId])
   @@map("incidents")
@@ -322,8 +340,18 @@ model Incident {
 // ISH BUYURTMALARI
 // ============================================
 
-enum WorkOrderStatus { OPEN IN_PROGRESS CLOSED }
-enum WorkOrderPriority { LOW MEDIUM HIGH URGENT }
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
 
 model WorkOrder {
   id              String            @id @default(uuid())
@@ -343,7 +371,6 @@ model WorkOrder {
   @@index([status])
   @@map("work_orders")
 }
-
 
 // ============================================
 // NARYAD-IJOZAT (Ish ruxsatnomasi)

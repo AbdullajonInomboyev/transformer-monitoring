@@ -59,10 +59,11 @@ const createSubstationSchema = z.object({
   code: z.string().min(1),
   regionId: z.string().uuid(),
   districtId: z.string().uuid().optional().nullable(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
   address: z.string().optional(),
   commissionedDate: z.string().optional(),
+  transformerCapacities: z.any().optional().nullable(),
   notes: z.string().optional(),
 });
 

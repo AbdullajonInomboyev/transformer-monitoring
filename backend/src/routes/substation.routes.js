@@ -78,6 +78,8 @@ router.post('/', validate(createSubstationSchema), async (req, res, next) => {
     const substation = await prisma.substation.create({
       data: {
         ...req.body,
+        latitude: req.body.latitude ? parseFloat(req.body.latitude) : null,
+        longitude: req.body.longitude ? parseFloat(req.body.longitude) : null,
         commissionedDate: req.body.commissionedDate ? new Date(req.body.commissionedDate) : null,
       },
     });
@@ -93,7 +95,12 @@ router.put('/:id', async (req, res, next) => {
     if (req.user.role === 'EMPLOYEE' && existing.regionId !== req.user.regionId) {
       throw new AppError('Boshqa hudud podstansiyasini tahrirlash mumkin emas', 403);
     }
-    const substation = await prisma.substation.update({ where: { id: req.params.id }, data: req.body });
+    const data = { ...req.body };
+    if (data.latitude !== undefined) data.latitude = data.latitude ? parseFloat(data.latitude) : null;
+    if (data.longitude !== undefined) data.longitude = data.longitude ? parseFloat(data.longitude) : null;
+    if (data.commissionedDate) data.commissionedDate = new Date(data.commissionedDate);
+
+    const substation = await prisma.substation.update({ where: { id: req.params.id }, data });
     res.json(successResponse(substation, 'Podstansiya yangilandi'));
   } catch (error) { next(error); }
 });

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { transformersApi, regionsApi } from '@/api/client';
 import { useAuthStore } from '@/context/authStore';
 import { Plus, Search, Filter, Download, Upload, Trash2, Edit } from 'lucide-react';
-
+import api from '@/api/client';
 
 const photoUrl = (url: string) => {
   if (!url) return '';
@@ -46,17 +46,73 @@ export default function TransformersPage() {
     try { await transformersApi.delete(id); loadTransformers(); } catch {}
   };
 
+  // CSV Export
+  const handleExport = () => {
+    const headers = ['Inventar №', 'Model', 'Tarmoq nomi', 'Hudud', 'Podstansiya', 'Tasarrufi', 'Aholi', 'Lat', 'Lng', 'Quvvat (kVA)', 'Status'];
+    const rows = transformers.map(t => [
+      t.inventoryNumber, t.model || '', t.networkName || '', t.region?.name || '', t.substation?.name || '',
+      t.areaType || '', t.estimatedPopulation || 0, t.latitude, t.longitude, t.capacityKva, t.status,
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.map((c: any) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `transformatorlar_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // CSV Import
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const text = ev.target?.result as string;
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length < 2) { alert('CSV fayl bo\'sh'); return; }
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+        let imported = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const vals = lines[i].match(/(".*?"|[^,]+)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
+          const row: any = {};
+          headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+          try {
+            await transformersApi.create({
+              inventoryNumber: row['Inventar №'] || `IMP-${Date.now()}-${i}`,
+              model: row['Model'] || '',
+              networkName: row['Tarmoq nomi'] || '',
+              regionId: user?.regionId || '',
+              latitude: parseFloat(row['Lat']) || 41.3,
+              longitude: parseFloat(row['Lng']) || 69.3,
+              capacityKva: parseInt(row['Quvvat (kVA)']) || 100,
+              status: row['Status'] || 'OPERATIONAL',
+              areaType: row['Tasarrufi'] || '',
+            });
+            imported++;
+          } catch {}
+        }
+        alert(`${imported} ta transformator import qilindi!`);
+        loadTransformers();
+      } catch { alert('CSV o\'qishda xatolik'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const totalPages = Math.ceil(total / limit);
   const isReadOnly = user?.role === 'INSPECTOR';
 
   const statusBadge = (status: string) => {
     const cls: Record<string, string> = {
-      OPERATIONAL: 'bg-emerald-100 text-emerald-700',
-      WARNING: 'bg-amber-100 text-amber-700',
+      OPERATIONAL: 'bg-green-100 text-green-700',
+      WARNING: 'bg-yellow-100 text-yellow-700',
       CRITICAL: 'bg-red-100 text-red-700',
       OFFLINE: 'bg-gray-100 text-gray-600',
     };
-    return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls[status] || ''}`}>{status}</span>;
+    const labels: Record<string, string> = {
+      OPERATIONAL: 'Ishlayapti', WARNING: 'Ogohlantirish', CRITICAL: 'Kritik', OFFLINE: 'O\'chgan',
+    };
+    return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls[status] || ''}`}>{labels[status] || status}</span>;
   };
 
   return (
@@ -67,12 +123,13 @@ export default function TransformersPage() {
           <p className="text-sm text-gray-500">Barcha transformatorlarni boshqarish, filtrlash va monitoring</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50">
+          <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50">
             <Download className="w-4 h-4" /> CSV Export
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50">
+          <label className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 cursor-pointer">
             <Upload className="w-4 h-4" /> CSV Import
-          </button>
+            <input type="file" accept=".csv" onChange={handleImport} className="hidden" />
+          </label>
           {!isReadOnly && (
             <Link to="/transformers/new" className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
               <Plus className="w-4 h-4" /> Yangi Transformator
@@ -113,10 +170,10 @@ export default function TransformersPage() {
               className="px-3 py-2 border rounded-lg text-sm"
             >
               <option value="">Barcha statuslar</option>
-              <option value="OPERATIONAL">Operational</option>
-              <option value="WARNING">Warning</option>
-              <option value="CRITICAL">Critical</option>
-              <option value="OFFLINE">Offline</option>
+              <option value="OPERATIONAL">Ishlayapti</option>
+              <option value="WARNING">Ogohlantirish</option>
+              <option value="CRITICAL">Kritik</option>
+              <option value="OFFLINE">O'chgan</option>
             </select>
             <input
               value={filters.minKva}
@@ -149,9 +206,10 @@ export default function TransformersPage() {
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Photo</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Inventar №</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Model</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Tarmoq nomi</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Hudud / Podstansiya</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Tasarrufi</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Aholi</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">GeoLocation</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Quvvat</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600">Amallar</th>
@@ -159,11 +217,11 @@ export default function TransformersPage() {
             </thead>
             <tbody className="divide-y">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">
                   <div className="animate-spin w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full mx-auto" />
                 </td></tr>
               ) : transformers.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">Transformator topilmadi</td></tr>
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">Transformator topilmadi</td></tr>
               ) : (
                 transformers.map(t => (
                   <tr
@@ -171,68 +229,36 @@ export default function TransformersPage() {
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => navigate(`/transformers/${t.id}`)}
                   >
-                    {/* Photo */}
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       {t.photoUrl ? (
-                        <img
-                          src={photoUrl(t.photoUrl)}
-                          alt={t.inventoryNumber}
-                          className="w-10 h-10 rounded-lg object-cover border"
-                        />
+                        <img src={photoUrl(t.photoUrl)} alt={t.inventoryNumber} className="w-10 h-10 rounded-lg object-cover border" />
                       ) : (
                         <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                           <span className="text-xs text-gray-400">N/A</span>
                         </div>
                       )}
                     </td>
-
-                    {/* Inventar */}
                     <td className="px-4 py-3 font-medium text-blue-600">{t.inventoryNumber}</td>
-
-                    {/* Model */}
                     <td className="px-4 py-3">{t.model || '—'}</td>
-
-                    {/* Hudud / Podstansiya */}
+                    <td className="px-4 py-3">{t.networkName || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium">{t.region?.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {t.substation?.name || '—'}
-                      </div>
+                      <div className="text-xs text-gray-500">{t.substation?.name || '—'}</div>
                     </td>
-
-                    {/* Aholi */}
+                    <td className="px-4 py-3 text-xs">{t.areaType || '—'}</td>
                     <td className="px-4 py-3">{t.estimatedPopulation?.toLocaleString() || '—'}</td>
-
-                    {/* GeoLocation */}
-                    <td className="px-4 py-3 text-xs text-gray-500 font-mono">
-                      {t.latitude?.toFixed(4)}, {t.longitude?.toFixed(4)}
-                    </td>
-
-                    {/* Quvvat */}
                     <td className="px-4 py-3">
                       <span className="text-blue-600 font-medium">{t.capacityKva} kVA</span>
                     </td>
-
-                    {/* Status */}
                     <td className="px-4 py-3">{statusBadge(t.status)}</td>
-
-                    {/* Amallar */}
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
                         {!isReadOnly && (
                           <>
-                            <button
-                              onClick={() => navigate(`/transformers/${t.id}/edit`)}
-                              className="text-blue-500 hover:text-blue-700"
-                              title="Tahrirlash"
-                            >
+                            <button onClick={() => navigate(`/transformers/${t.id}/edit`)} className="text-blue-500 hover:text-blue-700" title="Tahrirlash">
                               <Edit className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleDelete(t.id)}
-                              className="text-red-500 hover:text-red-700"
-                              title="O'chirish"
-                            >
+                            <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700" title="O'chirish">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </>
@@ -246,34 +272,12 @@ export default function TransformersPage() {
           </table>
         </div>
 
-        {/* Pagination */}
         <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
-          <span className="text-gray-500">
-            Jami {total} ta yozuv, sahifada {transformers.length} ta ko'rinmoqda
-          </span>
+          <span className="text-gray-500">Jami {total} ta yozuv, sahifada {transformers.length} ta ko'rinmoqda</span>
           <div className="flex items-center gap-2">
-            <select
-              value={limit}
-              className="px-2 py-1 border rounded text-sm"
-              disabled
-            >
-              <option value={10}>10 qator</option>
-            </select>
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage(p => p - 1)}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
-            >
-              Oldingi
-            </button>
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50">Oldingi</button>
             <span className="px-2">{page} / {totalPages || 1}</span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage(p => p + 1)}
-              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
-            >
-              Keyingi
-            </button>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50">Keyingi</button>
           </div>
         </div>
       </div>

@@ -3,17 +3,28 @@ import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Polygon } from 'react-leaflet';
 import L from 'leaflet';
 import { transformersApi, regionsApi } from '@/api/client';
-import { Map as MapIcon, Layers, Search } from 'lucide-react';
+import { Map as MapIcon, Layers, Search, Navigation } from 'lucide-react';
 
 const markerIcon = (status: string) => {
-  const colors: Record<string, string> = { OPERATIONAL: '#10b981', WARNING: '#f59e0b', CRITICAL: '#ef4444', OFFLINE: '#6b7280' };
-  const color = colors[status] || '#6b7280';
+  const colors: Record<string, string> = {
+    OPERATIONAL: '#22c55e',  // yashil
+    WARNING: '#eab308',      // sariq
+    CRITICAL: '#ef4444',     // qizil
+    OFFLINE: '#9ca3af',      // kulrang
+  };
+  const color = colors[status] || '#9ca3af';
   return L.divIcon({
     className: '',
     html: `<div style="width:28px;height:28px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>`,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   });
+};
+
+// Google Maps navigatsiya ochish
+const openNavigation = (lat: number, lng: number) => {
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+  window.open(url, '_blank');
 };
 
 export default function MapPage() {
@@ -25,6 +36,7 @@ export default function MapPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [satellite, setSatellite] = useState(false);
   const [showPolygons, setShowPolygons] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => { load(); }, []);
 
@@ -37,14 +49,23 @@ export default function MapPage() {
     finally { setLoading(false); }
   };
 
-  const filtered = transformers.filter(t =>
-    !searchQuery || t.inventoryNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.region?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = transformers.filter(t => {
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return t.inventoryNumber?.toLowerCase().includes(q) ||
+      t.address?.toLowerCase().includes(q) ||
+      t.region?.name?.toLowerCase().includes(q) ||
+      t.networkName?.toLowerCase().includes(q);
+  });
 
   const statusLabel: Record<string, string> = { OPERATIONAL: 'Normal', WARNING: 'Ogohlantirish', CRITICAL: 'Kritik', OFFLINE: 'Oflayn' };
-  const statusColor: Record<string, string> = { OPERATIONAL: '#10b981', WARNING: '#f59e0b', CRITICAL: '#ef4444', OFFLINE: '#6b7280' };
+  const statusColor: Record<string, string> = {
+    OPERATIONAL: '#22c55e',
+    WARNING: '#eab308',
+    CRITICAL: '#ef4444',
+    OFFLINE: '#9ca3af',
+  };
 
   return (
     <div>
@@ -60,6 +81,14 @@ export default function MapPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Qidirish..." className="pl-9 pr-4 py-2 border rounded-lg text-sm w-56 focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm">
+              <option value="">Barchasi</option>
+              <option value="OPERATIONAL">Normal</option>
+              <option value="WARNING">Ogohlantirish</option>
+              <option value="CRITICAL">Kritik</option>
+              <option value="OFFLINE">Oflayn</option>
+            </select>
             <label className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input type="checkbox" checked={showPolygons} onChange={e => setShowPolygons(e.target.checked)} />
               Hududlar chegarasi
@@ -70,9 +99,10 @@ export default function MapPage() {
         </div>
         <div className="flex items-center gap-4 mt-3">
           {Object.entries(statusLabel).map(([key, label]) => (
-            <div key={key} className="flex items-center gap-1.5 text-xs text-gray-600">
+            <button key={key} onClick={() => setStatusFilter(statusFilter === key ? '' : key)}
+              className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border ${statusFilter === key ? 'bg-gray-100 border-gray-400' : 'border-transparent'}`}>
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusColor[key] }} />{label}
-            </div>
+            </button>
           ))}
           {showPolygons && regions.length > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-gray-600 ml-4">
@@ -83,7 +113,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      <div className="flex gap-4" style={{ height: 'calc(100vh - 240px)' }}>
+      <div className="flex gap-4" style={{ height: 'calc(100vh - 260px)' }}>
         <div className="flex-1 rounded-xl overflow-hidden border">
           {loading ? (
             <div className="flex items-center justify-center h-full bg-gray-100"><div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>
@@ -91,13 +121,9 @@ export default function MapPage() {
             <MapContainer center={[41.3, 69.3]} zoom={6} className="h-full w-full">
               <TileLayer url={satellite ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'} />
 
-              {/* Hudud chegaralari */}
               {showPolygons && regions.map(r => (
-                <Polygon
-                  key={r.id}
-                  positions={r.polygonCoords}
-                  pathOptions={{ color: '#dc2626', fillColor: '#ef4444', fillOpacity: 0.1, weight: 2 }}
-                >
+                <Polygon key={r.id} positions={r.polygonCoords}
+                  pathOptions={{ color: '#dc2626', fillColor: '#ef4444', fillOpacity: 0.1, weight: 2 }}>
                   <Popup>
                     <div className="text-sm">
                       <strong>{r.name}</strong><br />
@@ -109,20 +135,25 @@ export default function MapPage() {
                 </Polygon>
               ))}
 
-              {/* Transformatorlar */}
               {filtered.map(t => (
                 <Marker key={t.id} position={[t.latitude, t.longitude]} icon={markerIcon(t.status)} eventHandlers={{ click: () => setSelected(t) }}>
                   <Popup>
-                    <div className="text-sm min-w-[200px]">
+                    <div className="text-sm min-w-[220px]">
                       <div className="font-bold text-base mb-1">{t.inventoryNumber}</div>
                       <div className="text-gray-600">{t.model} • {t.capacityKva} kVA</div>
+                      {t.networkName && <div className="text-gray-500 text-xs">Tarmoq: {t.networkName}</div>}
                       <div className="text-gray-500 text-xs mt-1">{t.region?.name}</div>
                       <div className="flex items-center gap-1 mt-1">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor[t.status] }} />
                         <span className="text-xs font-medium">{statusLabel[t.status]}</span>
                       </div>
                       <div className="text-xs text-gray-500 mt-1">Salomatlik: {t.healthScore}%</div>
-                      <button onClick={() => navigate(`/transformers/${t.id}`)} className="mt-2 w-full text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium">Batafsil ko'rish</button>
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => navigate(`/transformers/${t.id}`)} className="flex-1 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium">Batafsil</button>
+                        <button onClick={() => openNavigation(t.latitude, t.longitude)} className="flex items-center gap-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 font-medium">
+                          <Navigation className="w-3 h-3" /> Yo'l
+                        </button>
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
@@ -142,10 +173,16 @@ export default function MapPage() {
                 </div>
                 <div className="text-xs text-gray-500 space-y-0.5">
                   <div>Hudud: {t.region?.name}</div>
+                  {t.networkName && <div>Tarmoq: {t.networkName}</div>}
                   <div>Quvvat: {t.capacityKva} kVA</div>
                   <div>Salomatlik: {t.healthScore}%</div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); navigate(`/transformers/${t.id}`); }} className="mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 w-full">Batafsil</button>
+                <div className="flex gap-2 mt-2">
+                  <button onClick={(e) => { e.stopPropagation(); navigate(`/transformers/${t.id}`); }} className="flex-1 text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Batafsil</button>
+                  <button onClick={(e) => { e.stopPropagation(); openNavigation(t.latitude, t.longitude); }} className="flex items-center justify-center gap-1 text-xs bg-green-600 text-white px-2 py-1 rounded-lg hover:bg-green-700">
+                    <Navigation className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

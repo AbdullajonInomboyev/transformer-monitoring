@@ -23,6 +23,7 @@ router.get('/', async (req, res, next) => {
         { inventoryNumber: { contains: search, mode: 'insensitive' } },
         { model: { contains: search, mode: 'insensitive' } },
         { address: { contains: search, mode: 'insensitive' } },
+        { networkName: { contains: search, mode: 'insensitive' } },
       ];
     }
     if (regionId && req.user.role === 'ADMIN') where.regionId = regionId;
@@ -61,7 +62,7 @@ router.get('/map', async (req, res, next) => {
   try {
     const where = { ...req.regionFilter };
     const { regionId, status } = req.query;
-    
+
     if (regionId && req.user.role === 'ADMIN') where.regionId = regionId;
     if (status) where.status = status;
 
@@ -79,6 +80,8 @@ router.get('/map', async (req, res, next) => {
         healthScore: true,
         riskLevel: true,
         address: true,
+        networkName: true,
+        areaType: true,
         region: { select: { name: true } },
         substation: { select: { name: true } },
       },
@@ -114,7 +117,6 @@ router.get('/:id', async (req, res, next) => {
 
     if (!transformer) throw new AppError('Transformator topilmadi', 404);
 
-    // Hodim o'z hududinimi tekshirish
     if (req.user.role !== 'ADMIN' && transformer.regionId !== req.user.regionId) {
       throw new AppError('Bu transformatorni ko\'rish huquqi yo\'q', 403);
     }
@@ -130,7 +132,6 @@ router.get('/:id', async (req, res, next) => {
 // ============================================
 router.post('/', validate(createTransformerSchema), async (req, res, next) => {
   try {
-    // Hodim faqat o'z hududiga qo'sha oladi
     if (req.user.role === 'EMPLOYEE' && req.body.regionId !== req.user.regionId) {
       throw new AppError('Faqat o\'z hududingizga transformator qo\'shishingiz mumkin', 403);
     }

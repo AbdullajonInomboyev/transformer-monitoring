@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '@/api/client';
-import { transformersApi } from '@/api/client';
+import { transformersApi, usersApi } from '@/api/client';
 import { Plus, Edit, Trash2, X, Eye, FileText, Search } from 'lucide-react';
 
 const statusLabels: Record<string, string> = { OPEN: 'Ochiq', IN_PROGRESS: 'Jarayonda', COMPLETED: 'Bajarildi', CANCELLED: 'Bekor' };
@@ -10,6 +10,7 @@ const statusCls: Record<string, string> = { OPEN: 'bg-blue-100 text-blue-700', I
 export default function WorkPermitsPage() {
   const [items, setItems] = useState<any[]>([]);
   const [transformers, setTransformers] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -32,7 +33,7 @@ export default function WorkPermitsPage() {
   };
   const [form, setForm] = useState<any>(emptyForm);
 
-  useEffect(() => { load(); loadTransformers(); }, []);
+  useEffect(() => { load(); loadTransformers(); loadEmployees(); }, []);
   useEffect(() => { load(); }, [page, search]);
 
   const load = async () => {
@@ -47,7 +48,11 @@ export default function WorkPermitsPage() {
     try { const r = await transformersApi.map(); setTransformers(r.data.data); } catch {}
   };
 
-  const openCreate = () => { setForm(emptyForm); setEditItem(null); setModal('create'); };
+  const loadEmployees = async () => {
+    try { const r = await usersApi.list({ limit: 200 }); setEmployees(r.data.data || []); } catch {}
+  };
+
+  const openCreate = () => { setForm({ ...emptyForm, brigadeMembers: [{ name: '', role: '' }], safetyMeasures: [{ equipment: '', action: '' }], dailyLogs: [{ date: '', startTime: '', endTime: '', supervisorSign: '', performerSign: '' }], brigadeChanges: [{ memberIn: '', memberOut: '', date: '', permission: '' }] }); setEditItem(null); setModal('create'); };
   const openEdit = (item: any) => {
     setEditItem(item);
     setForm({
@@ -103,8 +108,8 @@ export default function WorkPermitsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Наряд-ижозат</h1>
-          <p className="text-sm text-gray-500">Электр қурилмаларда хавфсиз иш бажариш учун</p>
+          <h1 className="text-2xl font-bold">Naryad-ijozat</h1>
+          <p className="text-sm text-gray-500">Elektr qurilmalarda xavfsiz ish bajarish uchun</p>
         </div>
         <button onClick={openCreate} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
           <Plus className="w-4 h-4" /> Yangi naryad
@@ -139,7 +144,7 @@ export default function WorkPermitsPage() {
               <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">Yuklanmoqda...</td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">Naryad topilmadi</td></tr>
-            ) : items.map((item, i) => (
+            ) : items.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium">{item.number}</td>
                 <td className="px-4 py-3">{item.department || '—'}</td>
@@ -174,7 +179,7 @@ export default function WorkPermitsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white">
-              <h2 className="text-lg font-bold">Наряд-ижозат № {editItem.number}</h2>
+              <h2 className="text-lg font-bold">Naryad-ijozat № {editItem.number}</h2>
               <button onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
             </div>
             <div className="p-5 space-y-4 text-sm">
@@ -196,6 +201,15 @@ export default function WorkPermitsPage() {
                   <div className="mt-1 space-y-1">{editItem.brigadeMembers.map((m: any, i: number) => <div key={i} className="bg-gray-50 rounded p-2">{m.name} — {m.role}</div>)}</div>
                 </div>
               )}
+              {editItem.safetyMeasures?.length > 0 && (
+                <div><label className="font-medium">Xavfsizlik chora-tadbirlari:</label>
+                  <div className="mt-1 space-y-1">{editItem.safetyMeasures.map((m: any, i: number) => (
+                    <div key={i} className="bg-gray-50 rounded p-2">
+                      <span className="font-medium">{m.equipment}</span>: {m.action}
+                    </div>
+                  ))}</div>
+                </div>
+              )}
               <Info label="Alohida ko'rsatmalar" value={editItem.specialInstructions} />
               <div className="grid grid-cols-2 gap-4">
                 <Info label="Berdi" value={`${editItem.issuedByName || ''} ${editItem.issuedByDate ? new Date(editItem.issuedByDate).toLocaleDateString('uz') : ''}`} />
@@ -213,7 +227,7 @@ export default function WorkPermitsPage() {
             <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-600" />
-                {modal === 'create' ? 'Yangi Наряд-ижозат' : `Tahrirlash: №${editItem?.number}`}
+                {modal === 'create' ? 'Yangi Naryad-ijozat' : `Tahrirlash: №${editItem?.number}`}
               </h2>
               <button onClick={() => setModal(null)}><X className="w-5 h-5" /></button>
             </div>
@@ -231,11 +245,17 @@ export default function WorkPermitsPage() {
                 </div>
               </Section>
 
-              {/* 2. Brigada */}
+              {/* 2. Brigada — xodimlardan tanlash */}
               <Section title="Brigada a'zolari">
                 {form.brigadeMembers?.map((m: any, i: number) => (
                   <div key={i} className="flex items-center gap-2 mb-2">
-                    <input value={m.name} onChange={e => updateRow('brigadeMembers', i, 'name', e.target.value)} placeholder="F.I.O" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                    <select value={m.name} onChange={e => updateRow('brigadeMembers', i, 'name', e.target.value)}
+                      className="flex-1 px-3 py-2 border rounded-lg text-sm">
+                      <option value="">Xodimni tanlang...</option>
+                      {employees.map((emp: any) => (
+                        <option key={emp.id} value={emp.fullName}>{emp.fullName} ({emp.role})</option>
+                      ))}
+                    </select>
                     <input value={m.role} onChange={e => updateRow('brigadeMembers', i, 'role', e.target.value)} placeholder="Lavozimi / guruh" className="w-40 px-3 py-2 border rounded-lg text-sm" />
                     <button type="button" onClick={() => removeRow('brigadeMembers', i)} className="text-red-500 p-1"><X className="w-4 h-4" /></button>
                   </div>
@@ -260,13 +280,18 @@ export default function WorkPermitsPage() {
                 </div>
               </Section>
 
-              {/* 5. Xavfsizlik choralari (1-jadval) */}
+              {/* 5. Xavfsizlik choralari — action textarea qilindi */}
               <Section title="1-jadval: Xavfsizlik chora-tadbirlari">
                 {form.safetyMeasures?.map((m: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2 mb-2">
-                    <input value={m.equipment} onChange={e => updateRow('safetyMeasures', i, 'equipment', e.target.value)} placeholder="Elektr qurilma nomi" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-                    <input value={m.action} onChange={e => updateRow('safetyMeasures', i, 'action', e.target.value)} placeholder="Nimani o'chirish va qaerga ulash kerak" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-                    <button type="button" onClick={() => removeRow('safetyMeasures', i)} className="text-red-500 p-1"><X className="w-4 h-4" /></button>
+                  <div key={i} className="mb-3 p-3 bg-white border rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <input value={m.equipment} onChange={e => updateRow('safetyMeasures', i, 'equipment', e.target.value)} placeholder="Elektr qurilma nomi" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                      <button type="button" onClick={() => removeRow('safetyMeasures', i)} className="text-red-500 p-1"><X className="w-4 h-4" /></button>
+                    </div>
+                    <textarea value={m.action} onChange={e => updateRow('safetyMeasures', i, 'action', e.target.value)}
+                      placeholder="Nimani o'chirish va qaerga ulash kerak (ko'p qatorli yozish mumkin)"
+                      rows={3}
+                      className="w-full px-3 py-2 border rounded-lg text-sm resize-none" />
                   </div>
                 ))}
                 <button type="button" onClick={() => addRow('safetyMeasures', { equipment: '', action: '' })} className="text-xs text-blue-600 hover:underline">+ Qo'shish</button>
@@ -289,11 +314,11 @@ export default function WorkPermitsPage() {
                 </div>
               </Section>
 
-              {/* 8. Kundalik ish (3-jadval) */}
+              {/* 8. Kundalik ish */}
               <Section title="3-jadval: Kundalik ish qo'yish va tugash">
                 {form.dailyLogs?.map((m: any, i: number) => (
                   <div key={i} className="flex items-center gap-2 mb-2 flex-wrap">
-                    <input value={m.date} onChange={e => updateRow('dailyLogs', i, 'date', e.target.value)} placeholder="Sana" type="date" className="w-32 px-3 py-2 border rounded-lg text-sm" />
+                    <input value={m.date} onChange={e => updateRow('dailyLogs', i, 'date', e.target.value)} type="date" className="w-32 px-3 py-2 border rounded-lg text-sm" />
                     <input value={m.startTime} onChange={e => updateRow('dailyLogs', i, 'startTime', e.target.value)} placeholder="Boshlanish" className="w-24 px-3 py-2 border rounded-lg text-sm" />
                     <input value={m.endTime} onChange={e => updateRow('dailyLogs', i, 'endTime', e.target.value)} placeholder="Tugash" className="w-24 px-3 py-2 border rounded-lg text-sm" />
                     <input value={m.supervisorSign} onChange={e => updateRow('dailyLogs', i, 'supervisorSign', e.target.value)} placeholder="Qo'yuvchi" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
@@ -304,13 +329,13 @@ export default function WorkPermitsPage() {
                 <button type="button" onClick={() => addRow('dailyLogs', { date: '', startTime: '', endTime: '', supervisorSign: '', performerSign: '' })} className="text-xs text-blue-600 hover:underline">+ Kun qo'shish</button>
               </Section>
 
-              {/* 9. Brigada tarkibidagi o'zgarishlar (4-jadval) */}
+              {/* 9. Brigada tarkibidagi o'zgarishlar */}
               <Section title="4-jadval: Brigada tarkibidagi o'zgarishlar">
                 {form.brigadeChanges?.map((m: any, i: number) => (
                   <div key={i} className="flex items-center gap-2 mb-2 flex-wrap">
                     <input value={m.memberIn} onChange={e => updateRow('brigadeChanges', i, 'memberIn', e.target.value)} placeholder="Kiritildi (F.I.O)" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
                     <input value={m.memberOut} onChange={e => updateRow('brigadeChanges', i, 'memberOut', e.target.value)} placeholder="Chiqarildi (F.I.O)" className="flex-1 px-3 py-2 border rounded-lg text-sm" />
-                    <input value={m.date} onChange={e => updateRow('brigadeChanges', i, 'date', e.target.value)} placeholder="Sana" type="date" className="w-32 px-3 py-2 border rounded-lg text-sm" />
+                    <input value={m.date} onChange={e => updateRow('brigadeChanges', i, 'date', e.target.value)} type="date" className="w-32 px-3 py-2 border rounded-lg text-sm" />
                     <input value={m.permission} onChange={e => updateRow('brigadeChanges', i, 'permission', e.target.value)} placeholder="Ruxsat" className="w-24 px-3 py-2 border rounded-lg text-sm" />
                     <button type="button" onClick={() => removeRow('brigadeChanges', i)} className="text-red-500 p-1"><X className="w-4 h-4" /></button>
                   </div>
