@@ -1,7 +1,6 @@
 // ============================================
 // TRANSFORMATOR MONITORING TIZIMI
 // Ma'lumotlar bazasi sxemasi (Prisma ORM)
-// Davlat miqyosidagi loyiha
 // ============================================
 
 generator client {
@@ -12,10 +11,6 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
-// ============================================
-// FOYDALANUVCHILAR VA AUTENTIFIKATSIYA
-// ============================================
 
 enum UserRole {
   ADMIN
@@ -35,6 +30,8 @@ model User {
   passwordHash  String    @map("password_hash")
   fullName      String    @map("full_name")
   phone         String?
+  position      String?
+  avatarUrl     String?   @map("avatar_url")
   role          UserRole  @default(EMPLOYEE)
 
   assignmentType AssignmentType? @map("assignment_type")
@@ -43,11 +40,8 @@ model User {
   region        Region?   @relation(fields: [regionId], references: [id])
 
   districtIds   String[]  @default([]) @map("district_ids")
-
   customPolygon Json?     @map("custom_polygon")
-
   expiresAt     DateTime? @map("expires_at")
-
   isActive      Boolean   @default(true) @map("is_active")
   lastLoginAt   DateTime? @map("last_login_at")
 
@@ -77,10 +71,6 @@ model RefreshToken {
 
   @@map("refresh_tokens")
 }
-
-// ============================================
-// HUDUDLAR
-// ============================================
 
 model Region {
   id          String   @id @default(uuid())
@@ -123,10 +113,6 @@ model District {
   @@map("districts")
 }
 
-// ============================================
-// PODSTANSIYALAR
-// ============================================
-
 model Substation {
   id                      String    @id @default(uuid())
   name                    String
@@ -148,10 +134,6 @@ model Substation {
 
   @@map("substations")
 }
-
-// ============================================
-// TRANSFORMATORLAR
-// ============================================
 
 enum TransformerStatus {
   OPERATIONAL
@@ -215,10 +197,6 @@ model Transformer {
   @@map("transformers")
 }
 
-// ============================================
-// OGOHLANTIRISHLAR
-// ============================================
-
 enum AlertPriority {
   ACTIVE
   CRITICAL
@@ -251,10 +229,6 @@ model Alert {
   @@map("alerts")
 }
 
-// ============================================
-// TEXNIK XIZMAT
-// ============================================
-
 enum MaintenanceStatus {
   SCHEDULED
   IN_PROGRESS
@@ -281,10 +255,6 @@ model Maintenance {
   @@map("maintenance_records")
 }
 
-// ============================================
-// TEKSHIRUVLAR
-// ============================================
-
 enum InspectionResult {
   PASS
   FAIL
@@ -307,10 +277,6 @@ model Inspection {
   @@index([transformerId])
   @@map("inspections")
 }
-
-// ============================================
-// HODISALAR
-// ============================================
 
 enum Severity {
   LOW
@@ -335,10 +301,6 @@ model Incident {
   @@index([transformerId])
   @@map("incidents")
 }
-
-// ============================================
-// ISH BUYURTMALARI
-// ============================================
 
 enum WorkOrderStatus {
   OPEN
@@ -371,10 +333,6 @@ model WorkOrder {
   @@index([status])
   @@map("work_orders")
 }
-
-// ============================================
-// NARYAD-IJOZAT (Ish ruxsatnomasi)
-// ============================================
 
 enum WorkPermitStatus {
   OPEN
@@ -415,10 +373,6 @@ model WorkPermit {
 
   @@map("work_permits")
 }
-
-// ============================================
-// AUDIT LOG
-// ============================================
 
 model AuditLog {
   id          String   @id @default(uuid())

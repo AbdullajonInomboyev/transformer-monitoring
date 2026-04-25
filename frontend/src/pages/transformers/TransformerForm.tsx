@@ -6,11 +6,6 @@ import { ArrowLeft, MapPin, Upload, X, Image, Camera } from 'lucide-react';
 import MapPicker from '@/components/map/MapPicker';
 import api from '@/api/client';
 
-// Tarmoq nomlari ro'yxati
-const NETWORK_NAMES = [
-  'GKTP', 'SKTP', 'TKTP', 'KTP', 'TRP', 'YATP', 'BKTP', 'MTP',
-];
-
 export default function TransformerForm() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -69,53 +64,28 @@ export default function TransformerForm() {
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setPhotoFile(file);
-      const r = new FileReader();
-      r.onload = () => setPhotoPreview(r.result as string);
-      r.readAsDataURL(file);
-    }
+    if (file) { setPhotoFile(file); const r = new FileReader(); r.onload = () => setPhotoPreview(r.result as string); r.readAsDataURL(file); }
   };
-
-  const removePhoto = () => {
-    setPhotoPreview(null);
-    setPhotoFile(null);
-    update('photoUrl', '');
-  };
+  const removePhoto = () => { setPhotoPreview(null); setPhotoFile(null); update('photoUrl', ''); };
 
   const uploadPhoto = async (): Promise<string> => {
     if (!photoFile) return form.photoUrl;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', photoFile);
-      const res = await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const formData = new FormData(); formData.append('file', photoFile);
+      const res = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       return res.data.data.url;
-    } catch {
-      console.error('Rasm yuklashda xatolik');
-      return '';
-    } finally { setUploading(false); }
+    } catch { return ''; } finally { setUploading(false); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+    e.preventDefault(); setSaving(true);
     try {
       let photoUrl = form.photoUrl;
-      if (photoFile) {
-        photoUrl = await uploadPhoto();
-      }
-
-      const data = {
-        ...form,
-        photoUrl,
-        capacityKva: Number(form.capacityKva), manufactureYear: Number(form.manufactureYear),
+      if (photoFile) photoUrl = await uploadPhoto();
+      const data = { ...form, photoUrl, capacityKva: Number(form.capacityKva), manufactureYear: Number(form.manufactureYear),
         connectedHouseholds: Number(form.connectedHouseholds), estimatedPopulation: Number(form.estimatedPopulation),
-        healthScore: Number(form.healthScore), latitude: Number(form.latitude), longitude: Number(form.longitude),
-      };
-
+        healthScore: Number(form.healthScore), latitude: Number(form.latitude), longitude: Number(form.longitude) };
       if (isEdit) await transformersApi.update(id!, data);
       else await transformersApi.create(data);
       navigate('/transformers');
@@ -135,7 +105,6 @@ export default function TransformerForm() {
         <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"><ArrowLeft className="w-4 h-4" /> Orqaga</button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 1 - Asosiy */}
         <Sec n={1} t="Asosiy Ma'lumotlar">
           <div className="grid grid-cols-2 gap-4">
             <Inp l="Inventar Raqami *" v={form.inventoryNumber} c={v=>update('inventoryNumber',v)} p="Masalan: T-001" />
@@ -144,11 +113,10 @@ export default function TransformerForm() {
             <Sel l="Viloyat *" v={form.regionId} c={v=>update('regionId',v)} o={regions.map(r=>({v:r.id,l:r.name}))} dis={user?.role==='EMPLOYEE'} />
             <Sel l="Tuman" v={form.districtId} c={v=>update('districtId',v)} o={districts.map(d=>({v:d.id,l:d.name}))} />
             <Sel l="Podstansiya" v={form.substationId} c={v=>update('substationId',v)} o={substations.map(s=>({v:s.id,l:s.name}))} />
-            <Sel l="Tarmoq nomi" v={form.networkName} c={v=>update('networkName',v)} o={NETWORK_NAMES.map(n=>({v:n,l:n}))} full />
+            <Inp l="Tarmoq nomi" v={form.networkName} c={v=>update('networkName',v)} p="Masalan: GKTP, SKTP, KTP..." full />
           </div>
         </Sec>
 
-        {/* 2 - Joylashuv */}
         <Sec n={2} t="Joylashuv">
           <Inp l="Manzil" v={form.address} c={v=>update('address',v)} p="To'liq manzilni kiriting" full />
           <div className="grid grid-cols-2 gap-4 mt-4">
@@ -161,7 +129,6 @@ export default function TransformerForm() {
           </button>
         </Sec>
 
-        {/* 3 - Rasm */}
         <Sec n={3} t="Transformator Surati">
           <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
             {photoPreview ? (
@@ -185,7 +152,6 @@ export default function TransformerForm() {
           </div>
         </Sec>
 
-        {/* 4 - Aholi */}
         <Sec n={4} t="Aholi va Ist'molchilar">
           <div className="grid grid-cols-2 gap-4">
             <Inp l="Ulangan Xonadonlar" v={form.connectedHouseholds} c={v=>update('connectedHouseholds',v)} ty="number" />
@@ -194,7 +160,6 @@ export default function TransformerForm() {
           <div className="mt-4"><Sel l="Hudud Turi" v={form.areaType} c={v=>update('areaType',v)} o={[{v:'ETK tasarrufidagi',l:'ETK tasarrufidagi'},{v:'Yuridik iste\'molchi',l:'Yuridik iste\'molchi'},{v:'Byudjet',l:'Byudjet'}]} /></div>
         </Sec>
 
-        {/* 5 - Texnik */}
         <Sec n={5} t="Texnik Xususiyatlar">
           <div className="grid grid-cols-2 gap-4">
             <Inp l="Quvvat (kVA) *" v={form.capacityKva} c={v=>update('capacityKva',v)} ty="number" />
@@ -204,18 +169,15 @@ export default function TransformerForm() {
           </div>
         </Sec>
 
-        {/* 6 - Holat */}
         <Sec n={6} t="Holat">
           <Sel l="Holati" v={form.status} c={v=>update('status',v)} o={[{v:'OPERATIONAL',l:'Ishlayapti'},{v:'WARNING',l:'Ogohlantirish'},{v:'CRITICAL',l:'Kritik'},{v:'OFFLINE',l:'O\'chgan'}]} />
         </Sec>
 
-        {/* 7 - Izoh */}
         <Sec n={7} t="Qo'shimcha">
           <label className="block text-sm font-medium text-gray-700 mb-1">Izohlar</label>
           <textarea value={form.notes} onChange={e=>update('notes',e.target.value)} rows={3} placeholder="Qo'shimcha ma'lumotlar..." className="w-full px-4 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" />
         </Sec>
 
-        {/* Buttons */}
         <div className="flex items-center gap-3 justify-end pt-4 border-t">
           <button type="button" onClick={()=>navigate(-1)} className="px-6 py-2.5 border rounded-xl text-sm">Bekor</button>
           <button type="submit" disabled={saving || uploading} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
