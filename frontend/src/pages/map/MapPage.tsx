@@ -52,6 +52,29 @@ function MapClickHandler({ mode, onMapClick }: { mode: string; onMapClick: (lat:
 }
 
 // ============================================================
+// Sahifa ochilganda GPS joylashuvga fly
+// ============================================================
+function FlyToUserLocation() {
+  const map = useMap();
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current) return;
+    done.current = true;
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        map.flyTo([pos.coords.latitude, pos.coords.longitude], 13, { animate: true, duration: 1.2 });
+      },
+      () => {
+        // Ruxsat berilmasa yoki xato — hech narsa qilmaymiz
+      },
+      { timeout: 8000 }
+    );
+  }, [map]);
+  return null;
+}
+
+// ============================================================
 // Tanlangan elementga fly (zoom reset bo'lmaydi)
 // ============================================================
 function FlyToSelected({ selected }: { selected: any }) {
@@ -60,7 +83,11 @@ function FlyToSelected({ selected }: { selected: any }) {
   useEffect(() => {
     if (selected && selected.id !== prevId.current) {
       prevId.current = selected.id;
-      map.flyTo([selected.latitude, selected.longitude], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
+      const lat = parseFloat(selected.latitude);
+      const lng = parseFloat(selected.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        map.flyTo([lat, lng], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
+      }
     }
   }, [selected, map]);
   return null;
@@ -94,18 +121,20 @@ export default function MapPage() {
 
   const load = async () => {
     try {
-      const [t, r, p, l] = await Promise.all([
+      const [t, r] = await Promise.all([
         transformersApi.map(),
         regionsApi.list({ limit: 50 }),
-        powerApi.getPoles(),
-        powerApi.getLines(),
       ]);
       setTransformers(t.data.data);
       setRegions(r.data.data.filter((x: any) => x.polygonCoords && Array.isArray(x.polygonCoords) && x.polygonCoords.length >= 3));
+    } catch (err) { console.error('Asosiy xato:', err); }
+    finally { setLoading(false); }
+    // Stalba/liniya — alohida (migration bo'lmasa ham xarita ishlaydi)
+    try {
+      const [p, l] = await Promise.all([powerApi.getPoles(), powerApi.getLines()]);
       setPoles(p.data.data || []);
       setLines(l.data.data || []);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) { console.warn('Stalba/liniya yuklanmadi:', err); }
   };
 
   const handleMapClick = useCallback(async (lat: number, lng: number) => {
@@ -179,6 +208,7 @@ export default function MapPage() {
   const MapInner = () => (
     <>
       <MapClickHandler mode={mode} onMapClick={handleMapClick} />
+      <FlyToUserLocation />
       {selected && <FlyToSelected selected={selected} />}
       <TileLayer url={satellite
         ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
@@ -210,20 +240,7 @@ export default function MapPage() {
               if (mode === 'draw-line') handleNodeClick('pole', pole.id);
               else setSelectedPole(pole.id === selectedPole ? null : pole.id);
             },
-          }}>
-          {mode === 'view' && selectedPole === pole.id && (
-            <Popup>
-              <div className="text-sm">
-                <div className="font-semibold mb-1">Stalba</div>
-                <div className="text-xs text-gray-400 mb-2">{pole.latitude.toFixed(5)}, {pole.longitude.toFixed(5)}</div>
-                <button onClick={() => deletePole(pole.id)}
-                  className="flex items-center gap-1 text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 w-full justify-center">
-                  <Trash2 className="w-3 h-3" /> O'chirish
-                </button>
-              </div>
-            </Popup>
-          )}
-        </Marker>
+          }} />
       ))}
 
       {filtered.map(t => (
@@ -288,6 +305,34 @@ export default function MapPage() {
         ))}
     </div>
   );
+
+  // Tanlangan stalba panel (xaritadan tashqarida)
+  const SelectedPolePanel = () => {
+    const pole = poles.find(p => p.id === selectedPole);
+    if (!pole || mode !== 'view') return null;
+    return (
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] bg-white rounded-2xl shadow-xl border px-4 py-3 flex items-center gap-3">
+        <div className="w-3 h-3 rounded-full bg-slate-500 border-2 border-white shadow flex-shrink-0" />
+        <div>
+          <div className="text-sm font-semibold text-gray-800">Stalba tanlandi</div>
+          <div className="text-xs text-gray-400">{pole.latitude.toFixed(5)}, {pole.longitude.toFixed(5)}</div>
+        </div>
+        <div className="w-px h-8 bg-gray-200" />
+        <button
+          onClick={() => deletePole(pole.id)}
+          className="flex items-center gap-1.5 text-xs bg-red-500 text-white px-3 py-2 rounded-xl hover:bg-red-600 font-medium"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> O\'chirish
+        </button>
+        <button
+          onClick={() => setSelectedPole(null)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  };
 
   const DrawingBar = () => mode === 'view' ? null : (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] bg-white rounded-2xl shadow-xl border px-4 py-3 flex items-center gap-3 max-w-[90vw]">
@@ -395,6 +440,7 @@ export default function MapPage() {
                 <MapInner />
               </MapContainer>
               <DrawingBar />
+              <SelectedPolePanel />
             </div>
           ) : <ListContent />}
         </div>
@@ -412,6 +458,7 @@ export default function MapPage() {
                   <MapInner />
                 </MapContainer>
                 <DrawingBar />
+                <SelectedPolePanel />
                 {(poles.length > 0 || lines.length > 0) && (
                   <div className="absolute top-3 left-3 z-[1000] bg-white/90 backdrop-blur rounded-xl shadow px-3 py-2 text-xs flex items-center gap-3">
                     <span className="flex items-center gap-1 text-slate-600"><span className="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block" />{poles.length} stalba</span>
