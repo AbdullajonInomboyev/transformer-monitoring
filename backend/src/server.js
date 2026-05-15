@@ -18,6 +18,7 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const auditRoutes = require('./routes/audit.routes');
 const uploadRoutes = require('./routes/upload.routes');
 const workPermitRoutes = require('./routes/workpermit.routes');
+const powerLineRoutes = require('./routes/powerline.routes');
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/work-permits', workPermitRoutes);
+app.use('/api/power', powerLineRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

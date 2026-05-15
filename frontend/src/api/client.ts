@@ -112,3 +112,15 @@ export const usersApi = {
 export const auditApi = {
   list: (params?: any) => api.get("/audit-logs", { params }),
 };
+
+// ============ POWER POLES & LINES ============
+export const powerApi = {
+  getPoles: () => api.get('/power/poles'),
+  createPole: (data: any) => api.post('/power/poles', data),
+  updatePole: (id: string, data: any) => api.put(`/power/poles/${id}`, data),
+  deletePole: (id: string) => api.delete(`/power/poles/${id}`),
+
+  getLines: () => api.get('/power/lines'),
+  createLine: (data: any) => api.post('/power/lines', data),
+  deleteLine: (id: string) => api.delete(`/power/lines/${id}`),
+};

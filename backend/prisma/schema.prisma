@@ -189,6 +189,8 @@ model Transformer {
   incidents           Incident[]
   workOrders          WorkOrder[]
   workPermits         WorkPermit[]
+  fromLines           PowerLine[]        @relation("FromTransformerLines")
+  toLines             PowerLine[]        @relation("ToTransformerLines")
 
   @@index([regionId])
   @@index([districtId])
@@ -391,4 +393,54 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ============================================
+// STALBALAR (Power Poles)
+// ============================================
+model PowerPole {
+  id        String   @id @default(uuid())
+  latitude  Float
+  longitude Float
+  label     String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  fromLines PowerLine[] @relation("FromPole")
+  toLines   PowerLine[] @relation("ToPole")
+
+  @@map("power_poles")
+}
+
+// ============================================
+// LINIYALAR (Power Lines)
+// Transformator → Stalba → Stalba → Transformator
+// ============================================
+enum PowerLineType {
+  MAIN    // Asosiy liniya (ko'k rang)
+  BRANCH  // Tarmoq liniya (to'q sariq)
+}
+
+model PowerLine {
+  id                 String        @id @default(uuid())
+
+  // Boshlanish: transformator YOKI stalba
+  fromTransformerId  String?       @map("from_transformer_id")
+  fromTransformer    Transformer?  @relation("FromTransformerLines", fields: [fromTransformerId], references: [id])
+  fromPoleId         String?       @map("from_pole_id")
+  fromPole           PowerPole?    @relation("FromPole", fields: [fromPoleId], references: [id])
+
+  // Tugash: transformator YOKI stalba
+  toTransformerId    String?       @map("to_transformer_id")
+  toTransformer      Transformer?  @relation("ToTransformerLines", fields: [toTransformerId], references: [id])
+  toPoleId           String?       @map("to_pole_id")
+  toPole             PowerPole?    @relation("ToPole", fields: [toPoleId], references: [id])
+
+  lineType           PowerLineType @default(MAIN) @map("line_type")
+  label              String?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  @@map("power_lines")
 }
