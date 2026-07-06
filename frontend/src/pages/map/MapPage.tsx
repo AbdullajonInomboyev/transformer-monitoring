@@ -63,7 +63,21 @@ function FlyToUserLocation() {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        map.flyTo([pos.coords.latitude, pos.coords.longitude], 13, { animate: true, duration: 1.2 });
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        // Koordinata yaroqli bo'lsagina uchamiz (NaN xatosining oldini oladi)
+        if (
+          typeof lat === 'number' && typeof lng === 'number' &&
+          !isNaN(lat) && !isNaN(lng) &&
+          isFinite(lat) && isFinite(lng) &&
+          Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+        ) {
+          try {
+            map.flyTo([lat, lng], 13, { animate: true, duration: 1.2 });
+          } catch {
+            // Xarita hali tayyor bo'lmasa — jim o'tamiz
+          }
+        }
       },
       () => {
         // Ruxsat berilmasa yoki xato — hech narsa qilmaymiz
@@ -85,8 +99,12 @@ function FlyToSelected({ selected }: { selected: any }) {
       prevId.current = selected.id;
       const lat = parseFloat(selected.latitude);
       const lng = parseFloat(selected.longitude);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        map.flyTo([lat, lng], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
+      if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)) {
+        try {
+          map.flyTo([lat, lng], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
+        } catch {
+          // Xarita tayyor bo'lmasa jim o'tamiz
+        }
       }
     }
   }, [selected, map]);
