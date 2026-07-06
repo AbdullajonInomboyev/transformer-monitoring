@@ -134,3 +134,44 @@ export interface PaginatedResponse<T> {
   pagination: { total: number; page: number; limit: number; totalPages: number; hasNext: boolean; hasPrev: boolean; };
 }
 export interface SelectOption { id: string; name: string; code?: string; }
+
+// ============ METER TYPES ============
+export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE';
+export type MeterStatus = 'ACTIVE' | 'INACTIVE' | 'BROKEN' | 'REPLACED';
+
+export interface Meter {
+  id: string;
+  meterNumber: string;
+  transformerId: string;
+  transformer?: Transformer;
+  ownerName: string;
+  address?: string;
+  phone?: string;
+  meterType: MeterType;
+  meterModel?: string;
+  status: MeterStatus;
+  sealNumber?: string;
+  tariff?: number;
+  installationDate?: string;
+  lastReading?: number;
+  lastReadingDate?: string;
+  photoUrl?: string;
+  photos?: string[];
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
+  readings?: MeterReading[];
+  _count?: { readings: number };
+  createdAt: string;
+}
+
+export interface MeterReading {
+  id: string;
+  meterId: string;
+  reading: number;
+  readingDate: string;
+  consumption?: number;
+  recordedBy?: { id: string; fullName: string };
+  notes?: string;
+  createdAt: string;
+}

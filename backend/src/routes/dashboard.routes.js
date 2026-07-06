@@ -31,6 +31,9 @@ router.get('/overview', async (req, res, next) => {
       openIncidents,
       statusCounts,
       avgHealth,
+      totalMeters,
+      activeMeters,
+      brokenMeters,
     ] = await Promise.all([
       prisma.transformer.count({ where: regionWhere }),
       prisma.transformer.count({ where: { ...regionWhere, isOnline: true } }),
@@ -49,6 +52,9 @@ router.get('/overview', async (req, res, next) => {
         where: regionWhere,
         _avg: { healthScore: true },
       }),
+      prisma.meter.count({ where: { transformer: regionWhere } }),
+      prisma.meter.count({ where: { transformer: regionWhere, status: 'ACTIVE' } }),
+      prisma.meter.count({ where: { transformer: regionWhere, status: 'BROKEN' } }),
     ]);
 
     // Status breakdown
@@ -71,6 +77,11 @@ router.get('/overview', async (req, res, next) => {
       openWorkOrders,
       openIncidents,
       statusBreakdown,
+      meters: {
+        total: totalMeters,
+        active: activeMeters,
+        broken: brokenMeters,
+      },
     }));
   } catch (error) { next(error); }
 });
@@ -143,6 +154,41 @@ router.get('/critical-transformers', async (req, res, next) => {
     });
 
     res.json(successResponse(transformers));
+  } catch (error) { next(error); }
+});
+
+// ============================================
+// GET /api/dashboard/monthly-stats
+// Oxirgi 6 oy dinamikasi
+// ============================================
+router.get('/monthly-stats', async (req, res, next) => {
+  try {
+    const regionWhere = req.regionFilter.regionId
+      ? { regionId: req.regionFilter.regionId }
+      : {};
+    const viaTransformer = req.regionFilter.regionId
+      ? { transformer: { regionId: req.regionFilter.regionId } }
+      : {};
+
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      months.push({ start, end, label: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}` });
+    }
+
+    const data = await Promise.all(months.map(async (m) => {
+      const [transformers, incidents, maintenanceDone, meters] = await Promise.all([
+        prisma.transformer.count({ where: { ...regionWhere, createdAt: { gte: m.start, lt: m.end } } }),
+        prisma.incident.count({ where: { ...viaTransformer, occurredAt: { gte: m.start, lt: m.end } } }),
+        prisma.maintenance.count({ where: { ...viaTransformer, status: 'COMPLETED', completedDate: { gte: m.start, lt: m.end } } }),
+        prisma.meter.count({ where: { ...viaTransformer, createdAt: { gte: m.start, lt: m.end } } }),
+      ]);
+      return { month: m.label, transformers, incidents, maintenanceDone, meters };
+    }));
+
+    res.json(successResponse(data));
   } catch (error) { next(error); }
 });
 

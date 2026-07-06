@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
@@ -8,10 +9,20 @@ const { validate, loginSchema } = require('../validators');
 const { successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
 
+// Brute-force himoyasi: 15 daqiqada 10 ta urinish
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { success: false, error: "Juda ko'p urinish. 15 daqiqadan keyin qayta urinib ko'ring." },
+});
+
 // ============================================
 // POST /api/auth/login
 // ============================================
-router.post('/login', validate(loginSchema), async (req, res, next) => {
+router.post('/login', loginLimiter, validate(loginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -101,8 +112,18 @@ router.post('/refresh', async (req, res, next) => {
       throw new AppError('Yaroqsiz yoki muddati tugagan refresh token', 401);
     }
 
+    // BUG FIX: refresh token payload'ida rol yo'q — bazadan olamiz
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, role: true, isActive: true, expiresAt: true },
+    });
+    if (!user || !user.isActive) throw new AppError('Hisob faol emas', 403);
+    if (user.role === 'INSPECTOR' && user.expiresAt && new Date() > user.expiresAt) {
+      throw new AppError('Kirish muddati tugagan', 403);
+    }
+
     const newAccessToken = jwt.sign(
-      { userId: decoded.userId, role: decoded.role },
+      { userId: user.id, role: user.role },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
@@ -150,8 +171,12 @@ router.get('/me', authenticate, async (req, res, next) => {
         fullName: true,
         phone: true,
         role: true,
+        position: true,
+        avatarUrl: true,
         regionId: true,
         region: { select: { id: true, name: true, code: true } },
+        assignmentType: true,
+        districtIds: true,
         isActive: true,
         expiresAt: true,
         lastLoginAt: true,
@@ -159,6 +184,62 @@ router.get('/me', authenticate, async (req, res, next) => {
       },
     });
     res.json(successResponse(user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// PATCH /api/auth/me — O'z profilini tahrirlash
+// ============================================
+router.patch('/me', authenticate, async (req, res, next) => {
+  try {
+    const { fullName, phone, avatarUrl } = req.body;
+    const data = {};
+    if (fullName !== undefined) {
+      if (typeof fullName !== 'string' || fullName.trim().length < 2) {
+        throw new AppError('Ism kamida 2 ta belgi', 400);
+      }
+      data.fullName = fullName.trim();
+    }
+    if (phone !== undefined) data.phone = phone || null;
+    if (avatarUrl !== undefined) data.avatarUrl = avatarUrl || null;
+
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: { id: true, email: true, fullName: true, phone: true, avatarUrl: true, role: true, regionId: true },
+    });
+    res.json(successResponse(user, 'Profil yangilandi'));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============================================
+// PATCH /api/auth/change-password — O'z parolini o'zgartirish
+// ============================================
+router.patch('/change-password', authenticate, async (req, res, next) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) throw new AppError('Eski va yangi parol talab qilinadi', 400);
+    if (newPassword.length < 6) throw new AppError('Yangi parol kamida 6 ta belgi', 400);
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const isMatch = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!isMatch) throw new AppError("Eski parol noto'g'ri", 400);
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash } });
+
+    // Xavfsizlik uchun barcha refresh tokenlarni bekor qilamiz
+    await prisma.refreshToken.deleteMany({ where: { userId: req.user.id } });
+
+    await prisma.auditLog.create({
+      data: { userId: req.user.id, action: 'CHANGE_PASSWORD', entityType: 'User', entityId: req.user.id, ipAddress: req.ip },
+    });
+
+    res.json(successResponse(null, 'Parol muvaffaqiyatli o\'zgartirildi'));
   } catch (error) {
     next(error);
   }

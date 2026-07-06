@@ -5,6 +5,8 @@ const { authorize, inspectorReadOnly } = require('../middleware/rbac');
 const { validate, createDistrictSchema } = require('../validators');
 const { paginate, paginatedResponse, successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('District');
 
 router.use(authenticate, inspectorReadOnly);
 
@@ -51,7 +53,7 @@ router.get('/by-region/:regionId', async (req, res, next) => {
 });
 
 // POST /api/districts — ADMIN only
-router.post('/', authorize('ADMIN'), validate(createDistrictSchema), async (req, res, next) => {
+router.post('/', authorize('ADMIN'), validate(createDistrictSchema), audit('CREATE'), async (req, res, next) => {
   try {
     const district = await prisma.district.create({
       data: req.body,
@@ -64,7 +66,7 @@ router.post('/', authorize('ADMIN'), validate(createDistrictSchema), async (req,
 });
 
 // PUT /api/districts/:id
-router.put('/:id', authorize('ADMIN'), async (req, res, next) => {
+router.put('/:id', authorize('ADMIN'), audit('UPDATE'), async (req, res, next) => {
   try {
     const district = await prisma.district.update({ where: { id: req.params.id }, data: req.body });
     res.json(successResponse(district, 'Tuman yangilandi'));
@@ -72,7 +74,7 @@ router.put('/:id', authorize('ADMIN'), async (req, res, next) => {
 });
 
 // DELETE /api/districts/:id
-router.delete('/:id', authorize('ADMIN'), async (req, res, next) => {
+router.delete('/:id', authorize('ADMIN'), audit('DELETE'), async (req, res, next) => {
   try {
     await prisma.district.delete({ where: { id: req.params.id } });
     res.json(successResponse(null, 'Tuman o\'chirildi'));

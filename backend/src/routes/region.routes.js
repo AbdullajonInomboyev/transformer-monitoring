@@ -5,6 +5,8 @@ const { authorize, inspectorReadOnly } = require('../middleware/rbac');
 const { validate, createRegionSchema } = require('../validators');
 const { paginate, paginatedResponse, successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('Region');
 
 router.use(authenticate, inspectorReadOnly);
 
@@ -72,7 +74,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/regions — Faqat ADMIN
-router.post('/', authorize('ADMIN'), validate(createRegionSchema), async (req, res, next) => {
+router.post('/', authorize('ADMIN'), validate(createRegionSchema), audit('CREATE'), async (req, res, next) => {
   try {
     const region = await prisma.region.create({ data: req.body });
     res.status(201).json(successResponse(region, 'Hudud yaratildi'));
@@ -82,7 +84,7 @@ router.post('/', authorize('ADMIN'), validate(createRegionSchema), async (req, r
 });
 
 // PUT /api/regions/:id — Faqat ADMIN
-router.put('/:id', authorize('ADMIN'), async (req, res, next) => {
+router.put('/:id', authorize('ADMIN'), audit('UPDATE'), async (req, res, next) => {
   try {
     const region = await prisma.region.update({
       where: { id: req.params.id },
@@ -95,7 +97,7 @@ router.put('/:id', authorize('ADMIN'), async (req, res, next) => {
 });
 
 // DELETE /api/regions/:id — Faqat ADMIN
-router.delete('/:id', authorize('ADMIN'), async (req, res, next) => {
+router.delete('/:id', authorize('ADMIN'), audit('DELETE'), async (req, res, next) => {
   try {
     await prisma.region.delete({ where: { id: req.params.id } });
     res.json(successResponse(null, 'Hudud o\'chirildi'));

@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const prisma = require('../config/prisma');
 const { authenticate } = require('../middleware/auth');
-const { inspectorReadOnly, regionFilter } = require('../middleware/rbac');
+const { inspectorReadOnly, regionFilter, canWriteDistrict } = require('../middleware/rbac');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('Transformer');
 const { validate, createTransformerSchema, updateTransformerSchema } = require('../validators');
 const { paginate, paginatedResponse, successResponse, buildFilters } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
@@ -43,7 +45,7 @@ router.get('/', async (req, res, next) => {
           region: { select: { id: true, name: true, code: true } },
           district: { select: { id: true, name: true } },
           substation: { select: { id: true, name: true, code: true } },
-          _count: { select: { alerts: true, maintenance: true } },
+          _count: { select: { alerts: true, maintenance: true, meters: true } },
         },
       }),
       prisma.transformer.count({ where }),
@@ -110,7 +112,7 @@ router.get('/:id', async (req, res, next) => {
         inspections: { orderBy: { createdAt: 'desc' }, take: 5 },
         incidents: { orderBy: { createdAt: 'desc' }, take: 5 },
         _count: {
-          select: { alerts: true, maintenance: true, inspections: true, incidents: true, workOrders: true },
+          select: { alerts: true, maintenance: true, inspections: true, incidents: true, workOrders: true, meters: true },
         },
       },
     });
@@ -130,10 +132,13 @@ router.get('/:id', async (req, res, next) => {
 // ============================================
 // POST /api/transformers — Yangi yaratish
 // ============================================
-router.post('/', validate(createTransformerSchema), async (req, res, next) => {
+router.post('/', validate(createTransformerSchema), audit('CREATE'), async (req, res, next) => {
   try {
     if (req.user.role === 'EMPLOYEE' && req.body.regionId !== req.user.regionId) {
       throw new AppError('Faqat o\'z hududingizga transformator qo\'shishingiz mumkin', 403);
+    }
+    if (req.user.role === 'EMPLOYEE' && !canWriteDistrict(req.user, req.body.districtId)) {
+      throw new AppError('Faqat o\'zingizga biriktirilgan tumanlarga transformator qo\'shishingiz mumkin', 403);
     }
 
     const transformer = await prisma.transformer.create({
@@ -157,13 +162,20 @@ router.post('/', validate(createTransformerSchema), async (req, res, next) => {
 // ============================================
 // PUT /api/transformers/:id — Tahrirlash
 // ============================================
-router.put('/:id', validate(updateTransformerSchema), async (req, res, next) => {
+router.put('/:id', validate(updateTransformerSchema), audit('UPDATE'), async (req, res, next) => {
   try {
     const existing = await prisma.transformer.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new AppError('Transformator topilmadi', 404);
 
     if (req.user.role === 'EMPLOYEE' && existing.regionId !== req.user.regionId) {
       throw new AppError('Boshqa hudud transformatorini tahrirlash mumkin emas', 403);
+    }
+    // BUG FIX: hodim transformatorni boshqa hududga "ko'chira olmasin"
+    if (req.user.role === 'EMPLOYEE' && req.body.regionId && req.body.regionId !== req.user.regionId) {
+      throw new AppError('Transformatorni boshqa hududga o\'tkazish mumkin emas', 403);
+    }
+    if (req.user.role === 'EMPLOYEE' && !canWriteDistrict(req.user, existing.districtId)) {
+      throw new AppError('Bu tuman sizga biriktirilmagan', 403);
     }
 
     const transformer = await prisma.transformer.update({
@@ -187,13 +199,16 @@ router.put('/:id', validate(updateTransformerSchema), async (req, res, next) => 
 // ============================================
 // DELETE /api/transformers/:id
 // ============================================
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', audit('DELETE'), async (req, res, next) => {
   try {
     const existing = await prisma.transformer.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new AppError('Transformator topilmadi', 404);
 
     if (req.user.role === 'EMPLOYEE' && existing.regionId !== req.user.regionId) {
       throw new AppError('Boshqa hudud transformatorini o\'chirish mumkin emas', 403);
+    }
+    if (req.user.role === 'EMPLOYEE' && !canWriteDistrict(req.user, existing.districtId)) {
+      throw new AppError('Bu tuman sizga biriktirilmagan', 403);
     }
 
     await prisma.transformer.delete({ where: { id: req.params.id } });

@@ -2,12 +2,16 @@ const router = require('express').Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const config = require('../config');
 const { authenticate } = require('../middleware/auth');
 const { successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
 
 // Uploads papkasini yaratish
-const uploadDir = path.join(__dirname, '..', '..', 'uploads');
+// UPLOAD_DIR env orqali (Railway Volume uchun), aks holda backend/uploads
+const uploadDir = path.isAbsolute(config.upload.dir)
+  ? config.upload.dir
+  : path.join(__dirname, '..', '..', config.upload.dir.replace(/^\.\//, ''));
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 // Multer sozlamalari
@@ -31,7 +35,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: config.upload.maxFileSize }, // 5MB (default)
 });
 
 // POST /api/upload — Rasm yuklash

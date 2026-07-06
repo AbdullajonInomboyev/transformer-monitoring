@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { usersApi, regionsApi } from '@/api/client';
+import { usersApi, regionsApi, districtsApi } from '@/api/client';
 import api from '@/api/client';
 import { Plus, Edit, Trash2, Key, X, UserCheck, UserX, Upload, Camera } from 'lucide-react';
 
@@ -16,8 +16,27 @@ export default function UsersPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
-  const emptyForm: any = { email: '', password: '', fullName: '', phone: '', position: '', role: 'EMPLOYEE', regionId: '', expiresAt: '', avatarUrl: '' };
+  const emptyForm: any = { email: '', password: '', fullName: '', phone: '', position: '', role: 'EMPLOYEE', regionId: '', expiresAt: '', avatarUrl: '', assignmentType: 'REGION', districtIds: [] };
   const [form, setForm] = useState<any>(emptyForm);
+  const [districts, setDistricts] = useState<any[]>([]);
+
+  // Hudud tanlanganda tumanlarni yuklash
+  useEffect(() => {
+    if (form.regionId && (modal === 'create' || modal === 'edit')) {
+      districtsApi.byRegion(form.regionId).then(r => setDistricts(r.data.data)).catch(() => setDistricts([]));
+    } else {
+      setDistricts([]);
+    }
+  }, [form.regionId, modal]);
+
+  const toggleDistrict = (id: string) => {
+    setForm((f: any) => ({
+      ...f,
+      districtIds: f.districtIds.includes(id)
+        ? f.districtIds.filter((d: string) => d !== id)
+        : [...f.districtIds, id],
+    }));
+  };
 
   useEffect(() => { load(); loadRegions(); }, []);
   useEffect(() => { load(); }, [page]);
@@ -33,15 +52,17 @@ export default function UsersPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try { let avatarUrl = ''; if (avatarFile) avatarUrl = await uploadAvatar(); const data: any = { ...form, avatarUrl }; if (!data.expiresAt) delete data.expiresAt; if (!data.regionId) data.regionId = null; if (data.expiresAt) data.expiresAt = new Date(data.expiresAt).toISOString(); if (!data.position) delete data.position;
+      if (data.role === 'ADMIN' || !data.regionId) { data.assignmentType = 'REGION'; data.districtIds = []; }
+      if (data.assignmentType !== 'DISTRICTS') data.districtIds = [];
       await usersApi.create(data); setModal(null); setForm(emptyForm); setAvatarFile(null); setAvatarPreview(null); load();
     } catch (err: any) { alert(err.response?.data?.error || 'Xatolik'); } finally { setSaving(false); }
   };
 
-  const openEdit = (u: any) => { setEditUser(u); setForm({ email: u.email, password: '', fullName: u.fullName, phone: u.phone || '', position: u.position || '', role: u.role, regionId: u.regionId || '', expiresAt: u.expiresAt ? u.expiresAt.slice(0, 16) : '', avatarUrl: u.avatarUrl || '' }); setAvatarFile(null); setAvatarPreview(u.avatarUrl ? photoUrl(u.avatarUrl) : null); setModal('edit'); };
+  const openEdit = (u: any) => { setEditUser(u); setForm({ email: u.email, password: '', fullName: u.fullName, phone: u.phone || '', position: u.position || '', role: u.role, regionId: u.regionId || '', expiresAt: u.expiresAt ? u.expiresAt.slice(0, 16) : '', avatarUrl: u.avatarUrl || '', assignmentType: u.assignmentType || 'REGION', districtIds: Array.isArray(u.districtIds) ? u.districtIds : [] }); setAvatarFile(null); setAvatarPreview(u.avatarUrl ? photoUrl(u.avatarUrl) : null); setModal('edit'); };
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
-    try { let avatarUrl = form.avatarUrl; if (avatarFile) avatarUrl = await uploadAvatar(); const data: any = { fullName: form.fullName, phone: form.phone, position: form.position || null, role: form.role, regionId: form.regionId || null, avatarUrl }; if (form.expiresAt) data.expiresAt = new Date(form.expiresAt).toISOString(); else data.expiresAt = null;
+    try { let avatarUrl = form.avatarUrl; if (avatarFile) avatarUrl = await uploadAvatar(); const data: any = { fullName: form.fullName, phone: form.phone, position: form.position || null, role: form.role, regionId: form.regionId || null, avatarUrl, assignmentType: form.assignmentType || 'REGION', districtIds: form.assignmentType === 'DISTRICTS' ? form.districtIds : [] }; if (form.role === 'ADMIN' || !form.regionId) { data.assignmentType = 'REGION'; data.districtIds = []; } if (form.expiresAt) data.expiresAt = new Date(form.expiresAt).toISOString(); else data.expiresAt = null;
       await usersApi.update(editUser.id, data); setModal(null); setEditUser(null); setAvatarFile(null); setAvatarPreview(null); load();
     } catch (err: any) { alert(err.response?.data?.error || 'Xatolik'); } finally { setSaving(false); }
   };
@@ -166,6 +187,38 @@ export default function UsersPage() {
               </div>
               {form.role === 'INSPECTOR' && (
                 <div><label className="block text-xs font-medium text-gray-700 mb-1">Kirish muddati</label><input type="datetime-local" value={form.expiresAt} onChange={e => setForm((f: any) => ({...f, expiresAt: e.target.value}))} className="w-full px-3 py-2 border rounded-lg text-sm" /></div>
+              )}
+              {form.role !== 'ADMIN' && form.regionId && (
+                <div className="border rounded-lg p-3 bg-gray-50">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Biriktirish darajasi</label>
+                  <div className="flex gap-4 mb-2">
+                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <input type="radio" checked={form.assignmentType !== 'DISTRICTS'} onChange={() => setForm((f: any) => ({...f, assignmentType: 'REGION', districtIds: []}))} />
+                      Butun viloyat
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                      <input type="radio" checked={form.assignmentType === 'DISTRICTS'} onChange={() => setForm((f: any) => ({...f, assignmentType: 'DISTRICTS'}))} />
+                      Tanlangan tumanlar
+                    </label>
+                  </div>
+                  {form.assignmentType === 'DISTRICTS' && (
+                    districts.length === 0
+                      ? <p className="text-xs text-gray-400">Bu viloyatda tumanlar topilmadi</p>
+                      : (
+                        <div className="max-h-36 overflow-y-auto grid grid-cols-2 gap-1 mt-1">
+                          {districts.map(d => (
+                            <label key={d.id} className="flex items-center gap-1.5 text-xs cursor-pointer p-1 hover:bg-white rounded">
+                              <input type="checkbox" checked={form.districtIds.includes(d.id)} onChange={() => toggleDistrict(d.id)} />
+                              {d.name}
+                            </label>
+                          ))}
+                        </div>
+                      )
+                  )}
+                  {form.assignmentType === 'DISTRICTS' && form.districtIds.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-1.5">{form.districtIds.length} ta tuman tanlandi</p>
+                  )}
+                </div>
               )}
               <div className="flex gap-3 pt-3 border-t">
                 <button type="button" onClick={() => { setModal(null); setEditUser(null); setAvatarFile(null); setAvatarPreview(null); }} className="flex-1 sm:flex-none px-4 py-2.5 border rounded-lg text-sm">Bekor</button>

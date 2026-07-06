@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { transformersApi } from '@/api/client';
+import { transformersApi, metersApi } from '@/api/client';
 import { useAuthStore } from '@/context/authStore';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
-import { ArrowLeft, Edit, MapPin, Zap, Users, Activity, AlertTriangle, Wrench, Calendar, Building2 } from 'lucide-react';
+import { ArrowLeft, Edit, MapPin, Zap, Users, Activity, AlertTriangle, Wrench, Calendar, Building2, Gauge, Plus } from 'lucide-react';
 
 const markerIcon = L.divIcon({
   className: '',
@@ -26,12 +26,17 @@ export default function TransformerDetail() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [data, setData] = useState<any>(null);
+  const [meters, setMeters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const isReadOnly = user?.role === 'INSPECTOR';
 
   useEffect(() => { load(); }, [id]);
   const load = async () => {
-    try { const r = await transformersApi.get(id!); setData(r.data.data); } catch { navigate('/transformers'); }
+    try {
+      const r = await transformersApi.get(id!);
+      setData(r.data.data);
+      try { const m = await metersApi.byTransformer(id!); setMeters(m.data.data); } catch {}
+    } catch { navigate('/transformers'); }
     finally { setLoading(false); }
   };
 
@@ -127,6 +132,47 @@ export default function TransformerDetail() {
             </div>
           )}
 
+          {/* Hisoblagichlar */}
+          <div className="bg-white rounded-xl border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-lg flex items-center gap-2"><Gauge className="w-5 h-5 text-blue-600" /> Hisoblagichlar ({meters.length})</h2>
+              <div className="flex items-center gap-2">
+                {meters.length > 0 && <Link to={`/meters?transformerId=${id}`} className="text-sm text-blue-600 hover:underline">Barchasi</Link>}
+                {!isReadOnly && (
+                  <Link to={`/meters?transformerId=${id}`} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">
+                    <Plus className="w-3.5 h-3.5" /> Qo'shish
+                  </Link>
+                )}
+              </div>
+            </div>
+            {meters.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-6">Bu transformatorga hali hisoblagich biriktirilmagan</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {meters.slice(0, 8).map((m: any) => (
+                  <Link key={m.id} to={`/meters/${m.id}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-blue-50 transition border border-transparent hover:border-blue-200">
+                    {m.photoUrl
+                      ? <img src={photoUrl(m.photoUrl)} className="w-12 h-12 rounded-lg object-cover border flex-shrink-0" />
+                      : <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0"><Gauge className="w-5 h-5 text-blue-500" /></div>}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-sm text-blue-700 truncate">{m.meterNumber}</div>
+                      <div className="text-xs text-gray-600 truncate">{m.ownerName}</div>
+                      <div className="text-xs text-gray-400">Ko'rsatkich: {m.lastReading ?? '—'}</div>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${m.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : m.status === 'BROKEN' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {m.status === 'ACTIVE' ? 'Faol' : m.status === 'BROKEN' ? 'Buzilgan' : m.status === 'REPLACED' ? 'Almashtirilgan' : 'Nofaol'}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {meters.length > 8 && (
+              <Link to={`/meters?transformerId=${id}`} className="block text-center text-sm text-blue-600 hover:underline mt-3">
+                Yana {meters.length - 8} ta hisoblagichni ko'rish →
+              </Link>
+            )}
+          </div>
+
           {/* Texnik xizmat tarixi */}
           {data.maintenance && data.maintenance.length > 0 && (
             <div className="bg-white rounded-xl border p-6">
@@ -174,6 +220,7 @@ export default function TransformerDetail() {
               {/* Statistika */}
               {data._count && (
                 <div className="border-t pt-4 grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-blue-50 rounded-lg p-2 text-center"><div className="font-bold text-lg text-blue-700">{data._count.meters ?? meters.length}</div>Hisoblagichlar</div>
                   <div className="bg-gray-50 rounded-lg p-2 text-center"><div className="font-bold text-lg">{data._count.alerts}</div>Alertlar</div>
                   <div className="bg-gray-50 rounded-lg p-2 text-center"><div className="font-bold text-lg">{data._count.maintenance}</div>Xizmatlar</div>
                   <div className="bg-gray-50 rounded-lg p-2 text-center"><div className="font-bold text-lg">{data._count.inspections}</div>Tekshiruvlar</div>

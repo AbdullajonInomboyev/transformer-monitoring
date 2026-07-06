@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { dashboardApi } from '@/api/client';
-import { Zap, Activity, AlertTriangle, Wrench, TrendingUp } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Zap, Activity, AlertTriangle, Wrench, TrendingUp, Gauge } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import type { DashboardOverview } from '@/types';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [regionData, setRegionData] = useState<any[]>([]);
   const [criticals, setCriticals] = useState<any[]>([]);
+  const [monthly, setMonthly] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function DashboardPage() {
       setOverview(ov.data.data);
       setRegionData(rc.data.data);
       setCriticals(ct.data.data);
+      try { const ms = await dashboardApi.monthlyStats(); setMonthly(ms.data.data); } catch {}
     } catch (err) {
       console.error(err);
     } finally {
@@ -49,12 +51,34 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Boshqaruv paneliga umumiy ko'rinish</h1>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatCard icon={Zap} label="Transformatorlar" value={overview?.transformers.total || 0} sub={`${overview?.transformers.online || 0} onlayn / ${overview?.transformers.offline || 0} oflayn`} color="blue" />
+        <StatCard icon={Gauge} label="Hisoblagichlar" value={(overview as any)?.meters?.total || 0} sub={`${(overview as any)?.meters?.active || 0} faol / ${(overview as any)?.meters?.broken || 0} buzilgan`} color="blue" />
         <StatCard icon={Activity} label="O'rtacha salomatlik" value={`${overview?.avgHealthScore || 0}%`} sub={`${overview?.substations || 0} podstansiyalar`} color="emerald" />
         <StatCard icon={AlertTriangle} label="Faol ogohlantirishlar" value={overview?.alerts.active || 0} sub={`${overview?.alerts.critical || 0} kritik`} color="amber" />
         <StatCard icon={Wrench} label="Ochilgan muammolar" value={overview?.openWorkOrders || 0} sub={`${overview?.openIncidents || 0} hodisalar`} color="red" />
       </div>
+
+      {/* Oylik dinamika */}
+      {monthly.length > 0 && (
+        <div className="bg-white rounded-xl border p-6 mb-6">
+          <h2 className="font-semibold text-lg mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /> Oxirgi 6 oy dinamikasi</h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={monthly}>
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="transformers" name="Yangi transformatorlar" stroke="#3b82f6" strokeWidth={2} />
+                <Line type="monotone" dataKey="meters" name="Yangi hisoblagichlar" stroke="#8b5cf6" strokeWidth={2} />
+                <Line type="monotone" dataKey="incidents" name="Hodisalar" stroke="#ef4444" strokeWidth={2} />
+                <Line type="monotone" dataKey="maintenanceDone" name="Bajarilgan xizmatlar" stroke="#10b981" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

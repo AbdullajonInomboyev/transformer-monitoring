@@ -15,6 +15,12 @@ import MaintenancePage from '@/pages/maintenance/MaintenancePage';
 import UsersPage from '@/pages/users/UsersPage';
 import AuditPage from '@/pages/audit/AuditPage';
 import WorkPermitsPage from '@/pages/workpermits/WorkPermitsPage';
+import MetersPage from '@/pages/meters/MetersPage';
+import MeterDetail from '@/pages/meters/MeterDetail';
+import InspectionsPage from '@/pages/inspections/InspectionsPage';
+import IncidentsPage from '@/pages/incidents/IncidentsPage';
+import WorkOrdersPage from '@/pages/workorders/WorkOrdersPage';
+import ProfilePage from '@/pages/profile/ProfilePage';
 
 export default function App() {
   return (
@@ -33,6 +39,12 @@ export default function App() {
             <Route path="/transformers/new" element={<TransformerForm />} />
             <Route path="/transformers/:id" element={<TransformerDetail />} />
             <Route path="/transformers/:id/edit" element={<TransformerForm />} />
+            <Route path="/meters" element={<MetersPage />} />
+            <Route path="/meters/:id" element={<MeterDetail />} />
+            <Route path="/inspections" element={<InspectionsPage />} />
+            <Route path="/incidents" element={<IncidentsPage />} />
+            <Route path="/work-orders" element={<WorkOrdersPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/work-permits" element={<WorkPermitsPage />} />
             <Route path="/maintenance" element={<MaintenancePage />} />

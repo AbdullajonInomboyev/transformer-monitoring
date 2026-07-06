@@ -5,6 +5,8 @@ const { inspectorReadOnly, regionFilter } = require('../middleware/rbac');
 const { validate, createSubstationSchema } = require('../validators');
 const { paginate, paginatedResponse, successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('Substation');
 
 router.use(authenticate, inspectorReadOnly, regionFilter);
 
@@ -70,7 +72,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/substations
-router.post('/', validate(createSubstationSchema), async (req, res, next) => {
+router.post('/', validate(createSubstationSchema), audit('CREATE'), async (req, res, next) => {
   try {
     if (req.user.role === 'EMPLOYEE' && req.body.regionId !== req.user.regionId) {
       throw new AppError('Faqat o\'z hududingizga podstansiya qo\'shishingiz mumkin', 403);
@@ -88,7 +90,7 @@ router.post('/', validate(createSubstationSchema), async (req, res, next) => {
 });
 
 // PUT /api/substations/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', audit('UPDATE'), async (req, res, next) => {
   try {
     const existing = await prisma.substation.findUnique({ where: { id: req.params.id } });
     if (!existing) throw new AppError('Podstansiya topilmadi', 404);
@@ -106,7 +108,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/substations/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', audit('DELETE'), async (req, res, next) => {
   try {
     await prisma.substation.delete({ where: { id: req.params.id } });
     res.json(successResponse(null, 'Podstansiya o\'chirildi'));

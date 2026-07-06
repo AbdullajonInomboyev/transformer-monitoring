@@ -4,6 +4,7 @@ import { useAuthStore } from '@/context/authStore';
 import {
   LayoutDashboard, Map, Globe, Building2, Zap, AlertTriangle,
   Wrench, Users, FileText, LogOut, Menu, X, ChevronDown, Bell, ClipboardList,
+  Gauge, ClipboardCheck, Flame, ListTodo, UserCircle,
 } from 'lucide-react';
 
 const navItems = [
@@ -13,8 +14,12 @@ const navItems = [
   { path: '/work-permits', label: 'Naryad-ijozat', icon: ClipboardList },
   { path: '/substations', label: 'Podstansiyalar', icon: Building2 },
   { path: '/transformers', label: 'Transformatorlar', icon: Zap },
+  { path: '/meters', label: 'Hisoblagichlar', icon: Gauge },
   { path: '/alerts', label: 'Ogohlantirishlar', icon: AlertTriangle },
   { path: '/maintenance', label: 'Texnik xizmat', icon: Wrench },
+  { path: '/inspections', label: 'Tekshiruvlar', icon: ClipboardCheck },
+  { path: '/incidents', label: 'Hodisalar', icon: Flame },
+  { path: '/work-orders', label: 'Ish buyurtmalari', icon: ListTodo },
 ];
 
 const adminItems = [
@@ -204,6 +209,14 @@ export default function Layout() {
                       <div className="text-sm font-medium truncate">{user?.fullName}</div>
                       <div className="text-xs text-gray-500 truncate">{user?.email}</div>
                     </div>
+                    <Link
+                      to="/profile"
+                      onClick={() => setProfileOpen(false)}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <UserCircle className="w-4 h-4" />
+                      Mening profilim
+                    </Link>
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"

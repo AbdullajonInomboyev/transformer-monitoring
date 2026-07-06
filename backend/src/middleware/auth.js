@@ -24,6 +24,8 @@ const authenticate = async (req, res, next) => {
         fullName: true,
         role: true,
         regionId: true,
+        assignmentType: true,
+        districtIds: true,
         isActive: true,
         expiresAt: true,
       },

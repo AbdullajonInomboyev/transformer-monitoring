@@ -5,8 +5,14 @@ interface User {
   id: string;
   email: string;
   fullName: string;
+  phone?: string;
+  position?: string;
+  avatarUrl?: string;
   role: 'ADMIN' | 'EMPLOYEE' | 'INSPECTOR';
   regionId?: string;
+  region?: { id: string; name: string; code?: string };
+  assignmentType?: string;
+  districtIds?: string[];
 }
 
 interface AuthState {
@@ -16,6 +22,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  setUser: (user: User) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -44,6 +51,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     set({ user: null, isAuthenticated: false });
+  },
+
+  setUser: (user) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    set({ user });
   },
 
   checkAuth: async () => {

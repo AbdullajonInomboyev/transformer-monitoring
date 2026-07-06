@@ -15,9 +15,14 @@ const createUserSchema = z.object({
   email: z.string().email('Noto\'g\'ri email format'),
   password: z.string().min(6, 'Parol kamida 6 ta belgi'),
   fullName: z.string().min(2, 'Ism kamida 2 ta belgi'),
-  phone: z.string().optional(),
+  phone: z.string().optional().nullable(),
+  position: z.string().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
   role: z.enum(['ADMIN', 'EMPLOYEE', 'INSPECTOR']),
   regionId: z.string().uuid().optional().nullable(),
+  assignmentType: z.enum(['REGION', 'DISTRICTS', 'POLYGON']).optional().nullable(),
+  districtIds: z.array(z.string().uuid()).optional(),
+  isActive: z.boolean().optional(),
   expiresAt: z.string().datetime().optional().nullable(),
 });
 
@@ -122,6 +127,73 @@ const createMaintenanceSchema = z.object({
 });
 
 // ============================================
+// METER (HISOBLAGICH) VALIDATSIYA
+// ============================================
+const createMeterSchema = z.object({
+  meterNumber: z.string().min(1, 'Hisoblagich raqami talab qilinadi'),
+  transformerId: z.string().uuid('Transformator tanlanishi shart'),
+  ownerName: z.string().min(2, 'Egasining ismi kamida 2 ta belgi'),
+  address: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  meterType: z.enum(['SINGLE_PHASE', 'THREE_PHASE']).optional(),
+  meterModel: z.string().optional().nullable(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'BROKEN', 'REPLACED']).optional(),
+  sealNumber: z.string().optional().nullable(),
+  tariff: z.number().min(0).optional().nullable(),
+  installationDate: z.string().optional().nullable(),
+  lastReading: z.number().min(0).optional().nullable(),
+  lastReadingDate: z.string().optional().nullable(),
+  photoUrl: z.string().optional().nullable(),
+  photos: z.any().optional().nullable(),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+const updateMeterSchema = createMeterSchema.partial();
+
+const createMeterReadingSchema = z.object({
+  reading: z.number().min(0, "Ko'rsatkich manfiy bo'lishi mumkin emas"),
+  readingDate: z.string().min(1, 'Sana talab qilinadi'),
+  notes: z.string().optional().nullable(),
+});
+
+// ============================================
+// INSPECTION VALIDATSIYA
+// ============================================
+const createInspectionSchema = z.object({
+  transformerId: z.string().uuid(),
+  inspectionDate: z.string().min(1),
+  checklist: z.any().optional().nullable(),
+  findings: z.string().optional().nullable(),
+  result: z.enum(['PASS', 'FAIL', 'NEEDS_REPAIR']).optional(),
+});
+
+// ============================================
+// INCIDENT VALIDATSIYA
+// ============================================
+const createIncidentSchema = z.object({
+  transformerId: z.string().uuid(),
+  incidentType: z.string().min(2),
+  description: z.string().optional().nullable(),
+  occurredAt: z.string().min(1),
+  severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+});
+
+// ============================================
+// WORK ORDER VALIDATSIYA
+// ============================================
+const createWorkOrderSchema = z.object({
+  transformerId: z.string().uuid(),
+  title: z.string().min(2),
+  description: z.string().optional().nullable(),
+  assignedToId: z.string().uuid().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'CLOSED']).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+});
+
+// ============================================
 // VALIDATSIYA MIDDLEWARE
 // ============================================
 const validate = (schema) => {
@@ -146,5 +218,11 @@ module.exports = {
   updateTransformerSchema,
   createAlertSchema,
   createMaintenanceSchema,
+  createMeterSchema,
+  updateMeterSchema,
+  createMeterReadingSchema,
+  createInspectionSchema,
+  createIncidentSchema,
+  createWorkOrderSchema,
   validate,
 };

@@ -5,6 +5,8 @@ const { inspectorReadOnly, regionFilter } = require('../middleware/rbac');
 const { validate, createMaintenanceSchema } = require('../validators');
 const { paginate, paginatedResponse, successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('Maintenance');
 
 router.use(authenticate, inspectorReadOnly, regionFilter);
 
@@ -38,7 +40,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/maintenance
-router.post('/', validate(createMaintenanceSchema), async (req, res, next) => {
+router.post('/', validate(createMaintenanceSchema), audit('CREATE'), async (req, res, next) => {
   try {
     const record = await prisma.maintenance.create({
       data: {
@@ -52,7 +54,7 @@ router.post('/', validate(createMaintenanceSchema), async (req, res, next) => {
 });
 
 // PUT /api/maintenance/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', audit('UPDATE'), async (req, res, next) => {
   try {
     const record = await prisma.maintenance.update({
       where: { id: req.params.id },
@@ -67,7 +69,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/maintenance/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', audit('DELETE'), async (req, res, next) => {
   try {
     await prisma.maintenance.delete({ where: { id: req.params.id } });
     res.json(successResponse(null, 'Yozuv o\'chirildi'));

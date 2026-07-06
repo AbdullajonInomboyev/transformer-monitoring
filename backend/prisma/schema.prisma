@@ -57,6 +57,8 @@ model User {
   auditLogs             AuditLog[]
   createdWorkPermits    WorkPermit[]    @relation("WorkPermitCreatedBy")
   refreshTokens         RefreshToken[]
+  createdMeters         Meter[]         @relation("MeterCreatedBy")
+  recordedReadings      MeterReading[]  @relation("ReadingRecordedBy")
 
   @@map("users")
 }
@@ -189,6 +191,7 @@ model Transformer {
   incidents           Incident[]
   workOrders          WorkOrder[]
   workPermits         WorkPermit[]
+  meters              Meter[]
   fromLines           PowerLine[]        @relation("FromTransformerLines")
   toLines             PowerLine[]        @relation("ToTransformerLines")
 
@@ -214,7 +217,7 @@ enum AlertStatus {
 model Alert {
   id              String        @id @default(uuid())
   transformerId   String        @map("transformer_id")
-  transformer     Transformer   @relation(fields: [transformerId], references: [id])
+  transformer     Transformer   @relation(fields: [transformerId], references: [id], onDelete: Cascade)
   priority        AlertPriority
   title           String
   description     String?
@@ -241,7 +244,7 @@ enum MaintenanceStatus {
 model Maintenance {
   id              String            @id @default(uuid())
   transformerId   String            @map("transformer_id")
-  transformer     Transformer       @relation(fields: [transformerId], references: [id])
+  transformer     Transformer       @relation(fields: [transformerId], references: [id], onDelete: Cascade)
   workType        String            @map("work_type")
   description     String?
   scheduledDate   DateTime?         @map("scheduled_date")
@@ -266,7 +269,7 @@ enum InspectionResult {
 model Inspection {
   id              String           @id @default(uuid())
   transformerId   String           @map("transformer_id")
-  transformer     Transformer      @relation(fields: [transformerId], references: [id])
+  transformer     Transformer      @relation(fields: [transformerId], references: [id], onDelete: Cascade)
   inspectorId     String           @map("inspector_id")
   inspector       User             @relation("InspectorRel", fields: [inspectorId], references: [id])
   inspectionDate  DateTime         @map("inspection_date")
@@ -290,7 +293,7 @@ enum Severity {
 model Incident {
   id            String      @id @default(uuid())
   transformerId String      @map("transformer_id")
-  transformer   Transformer @relation(fields: [transformerId], references: [id])
+  transformer   Transformer @relation(fields: [transformerId], references: [id], onDelete: Cascade)
   incidentType  String      @map("incident_type")
   description   String?
   occurredAt    DateTime    @map("occurred_at")
@@ -320,7 +323,7 @@ enum WorkOrderPriority {
 model WorkOrder {
   id              String            @id @default(uuid())
   transformerId   String            @map("transformer_id")
-  transformer     Transformer       @relation(fields: [transformerId], references: [id])
+  transformer     Transformer       @relation(fields: [transformerId], references: [id], onDelete: Cascade)
   title           String
   description     String?
   assignedToId    String?           @map("assigned_to_id")
@@ -352,7 +355,7 @@ model WorkPermit {
   watcherName         String?           @map("watcher_name")
   brigadeMembers      Json?             @map("brigade_members")
   transformerId       String?           @map("transformer_id")
-  transformer         Transformer?      @relation(fields: [transformerId], references: [id])
+  transformer         Transformer?      @relation(fields: [transformerId], references: [id], onDelete: SetNull)
   taskDescription     String?           @map("task_description")
   workStartDate       DateTime?         @map("work_start_date")
   workStartTime       String?           @map("work_start_time")
@@ -402,6 +405,7 @@ model PowerPole {
   id        String   @id @default(uuid())
   latitude  Float
   longitude Float
+  regionId  String?  @map("region_id")
   label     String?
   notes     String?
   createdAt DateTime @default(now()) @map("created_at")
@@ -427,13 +431,13 @@ model PowerLine {
 
   // Boshlanish: transformator YOKI stalba
   fromTransformerId  String?       @map("from_transformer_id")
-  fromTransformer    Transformer?  @relation("FromTransformerLines", fields: [fromTransformerId], references: [id])
+  fromTransformer    Transformer?  @relation("FromTransformerLines", fields: [fromTransformerId], references: [id], onDelete: Cascade)
   fromPoleId         String?       @map("from_pole_id")
   fromPole           PowerPole?    @relation("FromPole", fields: [fromPoleId], references: [id])
 
   // Tugash: transformator YOKI stalba
   toTransformerId    String?       @map("to_transformer_id")
-  toTransformer      Transformer?  @relation("ToTransformerLines", fields: [toTransformerId], references: [id])
+  toTransformer      Transformer?  @relation("ToTransformerLines", fields: [toTransformerId], references: [id], onDelete: Cascade)
   toPoleId           String?       @map("to_pole_id")
   toPole             PowerPole?    @relation("ToPole", fields: [toPoleId], references: [id])
 
@@ -443,4 +447,72 @@ model PowerLine {
   updatedAt          DateTime      @updatedAt @map("updated_at")
 
   @@map("power_lines")
+}
+
+// ============================================
+// HISOBLAGICHLAR (Household Meters)
+// Har bir transformatorga biriktirilgan
+// xonadon hisoblagichlari
+// ============================================
+enum MeterType {
+  SINGLE_PHASE // Bir fazali
+  THREE_PHASE  // Uch fazali
+}
+
+enum MeterStatus {
+  ACTIVE   // Faol
+  INACTIVE // Nofaol
+  BROKEN   // Buzilgan
+  REPLACED // Almashtirilgan
+}
+
+model Meter {
+  id               String       @id @default(uuid())
+  meterNumber      String       @unique @map("meter_number")
+  transformerId    String       @map("transformer_id")
+  transformer      Transformer  @relation(fields: [transformerId], references: [id], onDelete: Cascade)
+  ownerName        String       @map("owner_name")
+  address          String?
+  phone            String?
+  meterType        MeterType    @default(SINGLE_PHASE) @map("meter_type")
+  meterModel       String?      @map("meter_model")
+  status           MeterStatus  @default(ACTIVE)
+  sealNumber       String?      @map("seal_number")
+  tariff           Float?
+  installationDate DateTime?    @map("installation_date")
+  lastReading      Float?       @map("last_reading")
+  lastReadingDate  DateTime?    @map("last_reading_date")
+  photoUrl         String?      @map("photo_url")
+  photos           Json?
+  latitude         Float?
+  longitude        Float?
+  notes            String?
+  createdById      String?      @map("created_by_id")
+  createdBy        User?        @relation("MeterCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  readings         MeterReading[]
+
+  @@index([transformerId])
+  @@index([status])
+  @@index([meterNumber])
+  @@map("meters")
+}
+
+model MeterReading {
+  id           String   @id @default(uuid())
+  meterId      String   @map("meter_id")
+  meter        Meter    @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  reading      Float
+  readingDate  DateTime @map("reading_date")
+  consumption  Float?   // Oldingi ko'rsatkichdan farq (kVt·soat)
+  recordedById String?  @map("recorded_by_id")
+  recordedBy   User?    @relation("ReadingRecordedBy", fields: [recordedById], references: [id])
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([meterId])
+  @@index([readingDate])
+  @@map("meter_readings")
 }

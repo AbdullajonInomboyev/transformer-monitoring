@@ -41,10 +41,35 @@ const regionFilter = (req, res, next) => {
   } else if (req.user.regionId) {
     // Hodim/Tekshiruvchi faqat o'z hududini
     req.regionFilter = { regionId: req.user.regionId };
+    // Tuman darajasida biriktirilgan bo'lsa — faqat o'sha tumanlar
+    if (
+      req.user.assignmentType === 'DISTRICTS' &&
+      Array.isArray(req.user.districtIds) &&
+      req.user.districtIds.length > 0
+    ) {
+      req.regionFilter.districtId = { in: req.user.districtIds };
+    }
   } else {
     return next(new AppError('Hudud biriktirilmagan. Admin bilan bog\'laning.', 403));
   }
   next();
+};
+
+// ============================================
+// TUMAN TEKSHIRISH (yozish amallari uchun)
+// Hodim tuman darajasida biriktirilgan bo'lsa,
+// faqat o'z tumanlariga yozishi mumkin
+// ============================================
+const canWriteDistrict = (user, districtId) => {
+  if (user.role === 'ADMIN') return true;
+  if (
+    user.assignmentType === 'DISTRICTS' &&
+    Array.isArray(user.districtIds) &&
+    user.districtIds.length > 0
+  ) {
+    return !!districtId && user.districtIds.includes(districtId);
+  }
+  return true; // Viloyat darajasida biriktirilgan
 };
 
 // ============================================
@@ -77,4 +102,4 @@ const ownerOrAdmin = (getResourceRegionId) => {
   };
 };
 
-module.exports = { authorize, inspectorReadOnly, regionFilter, ownerOrAdmin };
+module.exports = { authorize, inspectorReadOnly, regionFilter, ownerOrAdmin, canWriteDistrict };

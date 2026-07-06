@@ -19,6 +19,11 @@ const errorHandler = (err, req, res, next) => {
     message = `Bu ${field} allaqachon mavjud`;
   }
 
+  if (err.code === 'P2003') {
+    statusCode = 409;
+    message = "Bu yozuvga bog'liq boshqa ma'lumotlar mavjud. Avval ularni o'chiring.";
+  }
+
   if (err.code === 'P2025') {
     statusCode = 404;
     message = 'Yozuv topilmadi';

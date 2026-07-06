@@ -250,11 +250,14 @@ export default function MapPage() {
               if (mode === 'draw-line') handleNodeClick('transformer', t.id);
               else setSelected(t);
             },
+            // Ikki marta bosilsa — to'g'ridan-to'g'ri batafsil sahifaga
+            dblclick: () => { if (mode === 'view') navigate(`/transformers/${t.id}`); },
           }}>
           {mode === 'view' && (
             <Popup>
               <div className="text-sm min-w-[200px]">
-                <div className="font-bold text-base mb-1">{t.inventoryNumber}</div>
+                <div className="font-bold text-base mb-1 text-blue-700 cursor-pointer hover:underline"
+                  onClick={() => navigate(`/transformers/${t.id}`)}>{t.inventoryNumber}</div>
                 <div className="text-gray-600">{t.model} • {t.capacityKva} kVA</div>
                 {t.networkName && <div className="text-gray-500 text-xs">Tarmoq: {t.networkName}</div>}
                 <div className="text-gray-500 text-xs mt-1">{t.region?.name}</div>

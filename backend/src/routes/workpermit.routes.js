@@ -1,10 +1,13 @@
 const router = require('express').Router();
 const prisma = require('../config/prisma');
 const { authenticate } = require('../middleware/auth');
+const { inspectorReadOnly } = require('../middleware/rbac');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('WorkPermit');
 const { paginate, paginatedResponse, successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
 
-router.use(authenticate);
+router.use(authenticate, inspectorReadOnly);
 
 // GET /api/work-permits
 router.get('/', async (req, res, next) => {
@@ -57,7 +60,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // POST /api/work-permits
-router.post('/', async (req, res, next) => {
+router.post('/', audit('CREATE'), async (req, res, next) => {
   try {
     const data = { ...req.body, createdById: req.user.id };
     if (data.workStartDate) data.workStartDate = new Date(data.workStartDate);
@@ -78,9 +81,18 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT /api/work-permits/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', audit('UPDATE'), async (req, res, next) => {
   try {
+    // BUG FIX: boshqa hudud naryadini tahrirlashdan himoya
+    const existing = await prisma.workPermit.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new AppError('Naryad-ijozat topilmadi', 404);
+    if (req.user.role !== 'ADMIN' && existing.regionId && req.user.regionId && existing.regionId !== req.user.regionId) {
+      throw new AppError('Boshqa hudud naryadini tahrirlash mumkin emas', 403);
+    }
+
     const data = { ...req.body };
+    delete data.regionId;
+    delete data.createdById;
     if (data.workStartDate) data.workStartDate = new Date(data.workStartDate);
     if (data.workEndDate) data.workEndDate = new Date(data.workEndDate);
     if (data.issuedByDate) data.issuedByDate = new Date(data.issuedByDate);
@@ -98,8 +110,13 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/work-permits/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', audit('DELETE'), async (req, res, next) => {
   try {
+    const existing = await prisma.workPermit.findUnique({ where: { id: req.params.id } });
+    if (!existing) throw new AppError('Naryad-ijozat topilmadi', 404);
+    if (req.user.role !== 'ADMIN' && existing.regionId && req.user.regionId && existing.regionId !== req.user.regionId) {
+      throw new AppError('Boshqa hudud naryadini o\'chirish mumkin emas', 403);
+    }
     await prisma.workPermit.delete({ where: { id: req.params.id } });
     res.json(successResponse(null, 'O\'chirildi'));
   } catch (error) { next(error); }

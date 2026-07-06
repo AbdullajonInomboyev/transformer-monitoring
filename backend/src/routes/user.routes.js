@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('User');
 const { validate, createUserSchema, updateUserSchema } = require('../validators');
 const { paginate, paginatedResponse, successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
@@ -35,8 +37,9 @@ router.get('/', async (req, res, next) => {
         take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true, email: true, fullName: true, phone: true,
-          role: true, regionId: true, isActive: true, expiresAt: true,
+          id: true, email: true, fullName: true, phone: true, position: true, avatarUrl: true,
+          role: true, regionId: true, assignmentType: true, districtIds: true,
+          isActive: true, expiresAt: true,
           lastLoginAt: true, createdAt: true,
           region: { select: { id: true, name: true, code: true } },
         },
@@ -53,7 +56,7 @@ router.get('/', async (req, res, next) => {
 // ============================================
 // POST /api/users — Yangi foydalanuvchi
 // ============================================
-router.post('/', validate(createUserSchema), async (req, res, next) => {
+router.post('/', validate(createUserSchema), audit('CREATE'), async (req, res, next) => {
   try {
     const { password, ...data } = req.body;
     const passwordHash = await bcrypt.hash(password, 12);
@@ -81,8 +84,9 @@ router.get('/:id', async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { id: req.params.id },
       select: {
-        id: true, email: true, fullName: true, phone: true,
-        role: true, regionId: true, isActive: true, expiresAt: true,
+        id: true, email: true, fullName: true, phone: true, position: true, avatarUrl: true,
+        role: true, regionId: true, assignmentType: true, districtIds: true,
+        isActive: true, expiresAt: true,
         lastLoginAt: true, createdAt: true,
         region: { select: { id: true, name: true, code: true } },
       },
@@ -97,7 +101,7 @@ router.get('/:id', async (req, res, next) => {
 // ============================================
 // PUT /api/users/:id — Tahrirlash
 // ============================================
-router.put('/:id', validate(updateUserSchema), async (req, res, next) => {
+router.put('/:id', validate(updateUserSchema), audit('UPDATE'), async (req, res, next) => {
   try {
     const user = await prisma.user.update({
       where: { id: req.params.id },
@@ -116,7 +120,7 @@ router.put('/:id', validate(updateUserSchema), async (req, res, next) => {
 // ============================================
 // DELETE /api/users/:id
 // ============================================
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', audit('DEACTIVATE'), async (req, res, next) => {
   try {
     if (req.params.id === req.user.id) {
       throw new AppError('O\'zingizni o\'chira olmaysiz', 400);
@@ -134,7 +138,7 @@ router.delete('/:id', async (req, res, next) => {
 // ============================================
 // PATCH /api/users/:id/reset-password
 // ============================================
-router.patch('/:id/reset-password', async (req, res, next) => {
+router.patch('/:id/reset-password', audit('RESET_PASSWORD'), async (req, res, next) => {
   try {
     const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {

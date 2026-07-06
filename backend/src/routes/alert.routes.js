@@ -5,6 +5,8 @@ const { inspectorReadOnly, regionFilter } = require('../middleware/rbac');
 const { validate, createAlertSchema } = require('../validators');
 const { paginate, paginatedResponse, successResponse } = require('../utils/helpers');
 const { AppError } = require('../middleware/errorHandler');
+const { auditLog } = require('../middleware/auditLog');
+const audit = auditLog('Alert');
 
 router.use(authenticate, inspectorReadOnly, regionFilter);
 
@@ -44,7 +46,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/alerts
-router.post('/', validate(createAlertSchema), async (req, res, next) => {
+router.post('/', validate(createAlertSchema), audit('CREATE'), async (req, res, next) => {
   try {
     const alert = await prisma.alert.create({
       data: req.body,
@@ -55,7 +57,7 @@ router.post('/', validate(createAlertSchema), async (req, res, next) => {
 });
 
 // PATCH /api/alerts/:id/resolve
-router.patch('/:id/resolve', async (req, res, next) => {
+router.patch('/:id/resolve', audit('RESOLVE'), async (req, res, next) => {
   try {
     const alert = await prisma.alert.update({
       where: { id: req.params.id },
@@ -70,7 +72,7 @@ router.patch('/:id/resolve', async (req, res, next) => {
 });
 
 // DELETE /api/alerts/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', audit('DELETE'), async (req, res, next) => {
   try {
     await prisma.alert.delete({ where: { id: req.params.id } });
     res.json(successResponse(null, 'Ogohlantirish o\'chirildi'));
