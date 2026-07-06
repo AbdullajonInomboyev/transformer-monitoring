@@ -16,7 +16,7 @@ const markerIcon = L.divIcon({
 
 const photoUrl = (url: string) => {
   if (!url) return '';
-  if (url.startsWith('http')) return url;
+  if (url.startsWith('data:') || url.startsWith('http')) return url;
   const base = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
   return base ? base + url : url;
 };
