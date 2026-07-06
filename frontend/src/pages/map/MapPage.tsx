@@ -61,37 +61,28 @@ function MapClickHandler({ mode, onMapClick }: { mode: string; onMapClick: (lat:
 // ============================================================
 // Sahifa ochilganda GPS joylashuvga fly
 // ============================================================
-function FlyToUserLocation() {
+// ============================================================
+// Xarita ochilganda barcha transformatorlarni ko'rsatish
+// (avtomatik GPS'ga uchish OLIB TASHLANDI — foydalanuvchini
+//  chalkashtirardi. GPS kerak bo'lsa "Mening joyim" tugmasi bor)
+// ============================================================
+function FitAllOnLoad({ points }: { points: Array<[number, number]> }) {
   const map = useMap();
   const done = useRef(false);
   useEffect(() => {
-    if (done.current) return;
+    if (done.current || !points.length) return;
     done.current = true;
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        // Koordinata yaroqli bo'lsagina uchamiz (NaN xatosining oldini oladi)
-        if (
-          typeof lat === 'number' && typeof lng === 'number' &&
-          !isNaN(lat) && !isNaN(lng) &&
-          isFinite(lat) && isFinite(lng) &&
-          Math.abs(lat) <= 90 && Math.abs(lng) <= 180
-        ) {
-          try {
-            map.flyTo([lat, lng], 13, { animate: true, duration: 1.2 });
-          } catch {
-            // Xarita hali tayyor bo'lmasa — jim o'tamiz
-          }
-        }
-      },
-      () => {
-        // Ruxsat berilmasa yoki xato — hech narsa qilmaymiz
-      },
-      { timeout: 8000 }
-    );
-  }, [map]);
+    try {
+      if (points.length === 1) {
+        map.setView(points[0], 15);
+      } else {
+        const bounds = L.latLngBounds(points);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    } catch {
+      // Xarita tayyor bo'lmasa jim o'tamiz
+    }
+  }, [points, map]);
   return null;
 }
 
@@ -104,11 +95,9 @@ function FlyToSelected({ selected }: { selected: any }) {
   useEffect(() => {
     if (selected && selected.id !== prevId.current) {
       prevId.current = selected.id;
-      const lat = parseFloat(selected.latitude);
-      const lng = parseFloat(selected.longitude);
-      if (!isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)) {
+      if (isValidCoord(selected.latitude, selected.longitude)) {
         try {
-          map.flyTo([lat, lng], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
+          map.flyTo([Number(selected.latitude), Number(selected.longitude)], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 });
         } catch {
           // Xarita tayyor bo'lmasa jim o'tamiz
         }
@@ -269,7 +258,7 @@ export default function MapPage() {
   const MapInner = () => (
     <>
       <MapClickHandler mode={mode} onMapClick={handleMapClick} />
-      <FlyToUserLocation />
+      <FitAllOnLoad points={transformers.filter(t => isValidCoord(t.latitude, t.longitude)).map(t => [Number(t.latitude), Number(t.longitude)] as [number, number])} />
       {selected && <FlyToSelected selected={selected} />}
       <TileLayer url={satellite
         ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
