@@ -1,17 +1,46 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { metersApi, transformersApi, regionsApi } from '@/api/client';
-import api from '@/api/client';
 import { useAuthStore } from '@/context/authStore';
-import { Plus, Search, Filter, Download, X, Gauge, Camera, Upload, Trash2, Edit, ArrowUpDown, Eye } from 'lucide-react';
+import { Plus, Search, Filter, Download, X, Gauge, Camera, Trash2, Edit, ArrowUpDown, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const photoUrl = (url?: string) => {
   if (!url) return '';
-  if (url.startsWith('http')) return url;
+  // base64 (data:image/...) yoki to'liq http manzil — to'g'ridan-to'g'ri ishlatiladi
+  if (url.startsWith('data:') || url.startsWith('http')) return url;
+  // eski, serverga saqlangan rasmlar uchun (orqaga moslik)
   const base = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
   return base ? base + url : url;
 };
+
+// Rasmni base64'ga o'giradi va kerak bo'lsa siqadi (baza kichik bo'lishi uchun)
+const fileToCompressedBase64 = (file: File, maxSize = 1200, quality = 0.75): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxSize || height > maxSize) {
+          if (width > height) { height = Math.round(height * maxSize / width); width = maxSize; }
+          else { width = Math.round(width * maxSize / height); height = maxSize; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(reader.result as string); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+const MAX_PHOTOS = 5;
 
 const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Faol', INACTIVE: 'Nofaol', BROKEN: 'Buzilgan', REPLACED: 'Almashtirilgan' };
 const STATUS_CLS: Record<string, string> = {
@@ -49,8 +78,6 @@ export default function MetersPage() {
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
-  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const limit = 10;
   const isReadOnly = user?.role === 'INSPECTOR';
 
@@ -86,42 +113,40 @@ export default function MetersPage() {
     else { setSortBy(field); setSortDir('asc'); }
   };
 
-  // ============ RASM YUKLASH ============
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ============ RASM YUKLASH (base64) ============
+  // Rasmlar to'g'ridan-to'g'ri form.photos ichida base64 sifatida saqlanadi
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setPhotoFiles(prev => [...prev, ...files]);
-    files.forEach(f => {
-      const r = new FileReader();
-      r.onload = () => setPhotoPreviews(prev => [...prev, r.result as string]);
-      r.readAsDataURL(f);
-    });
     e.target.value = '';
+    if (!files.length) return;
+
+    const current = form.photos || [];
+    const freeSlots = MAX_PHOTOS - current.length;
+    if (freeSlots <= 0) {
+      toast.error(`Ko'pi bilan ${MAX_PHOTOS} ta rasm qo'shish mumkin`);
+      return;
+    }
+    const tanlangan = files.slice(0, freeSlots);
+    if (files.length > freeSlots) {
+      toast(`Faqat ${freeSlots} ta rasm qo'shildi (jami ${MAX_PHOTOS} tagacha)`);
+    }
+
+    try {
+      const base64List = await Promise.all(tanlangan.map(f => fileToCompressedBase64(f)));
+      setForm((f: any) => ({ ...f, photos: [...(f.photos || []), ...base64List] }));
+    } catch {
+      toast.error('Rasmni o\'qishda xatolik');
+    }
   };
+
   const removePhoto = (idx: number) => {
-    const existingCount = (form.photos || []).length;
-    if (idx < existingCount) {
-      setForm((f: any) => ({ ...f, photos: f.photos.filter((_: any, i: number) => i !== idx) }));
-    } else {
-      const fileIdx = idx - existingCount;
-      setPhotoFiles(prev => prev.filter((_, i) => i !== fileIdx));
-    }
-    setPhotoPreviews(prev => prev.filter((_, i) => i !== idx));
-  };
-  const uploadPhotos = async (): Promise<string[]> => {
-    const urls: string[] = [];
-    for (const file of photoFiles) {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      urls.push(res.data.data.url);
-    }
-    return urls;
+    setForm((f: any) => ({ ...f, photos: (f.photos || []).filter((_: any, i: number) => i !== idx) }));
   };
 
   // ============ CRUD ============
   const openCreate = () => {
     setForm({ ...emptyForm, transformerId: filters.transformerId || '' });
-    setPhotoFiles([]); setPhotoPreviews([]); setEditMeter(null); setModal('create');
+    setEditMeter(null); setModal('create');
   };
   const openEdit = (m: any) => {
     setEditMeter(m);
@@ -133,16 +158,13 @@ export default function MetersPage() {
       installationDate: m.installationDate ? m.installationDate.slice(0, 10) : '',
       lastReading: m.lastReading ?? '', notes: m.notes || '', photoUrl: m.photoUrl || '', photos,
     });
-    setPhotoFiles([]);
-    setPhotoPreviews(photos.map((p: string) => photoUrl(p)));
     setModal('edit');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {
-      const newUrls = photoFiles.length ? await uploadPhotos() : [];
-      const allPhotos = [...(form.photos || []), ...newUrls];
+      const allPhotos: string[] = form.photos || [];
       const data: any = {
         meterNumber: form.meterNumber.trim(),
         transformerId: form.transformerId,
@@ -390,19 +412,24 @@ export default function MetersPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Rasmlar */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">Hisoblagich rasmlari</label>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Hisoblagich rasmlari <span className="text-gray-400 font-normal">({(form.photos || []).length}/{MAX_PHOTOS})</span>
+                </label>
                 <div className="flex flex-wrap gap-2">
-                  {photoPreviews.map((src, i) => (
+                  {(form.photos || []).map((src: string, i: number) => (
                     <div key={i} className="relative">
-                      <img src={src} className="w-20 h-20 rounded-lg object-cover border" />
+                      <img src={photoUrl(src)} className="w-20 h-20 rounded-lg object-cover border" />
                       <button type="button" onClick={() => removePhoto(i)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"><X className="w-3 h-3" /></button>
                     </div>
                   ))}
-                  <label className="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-blue-400 hover:text-blue-500">
-                    <Camera className="w-5 h-5" /><span className="text-[10px] mt-1">Qo'shish</span>
-                    <input type="file" accept="image/*" capture="environment" multiple onChange={handlePhotoChange} className="hidden" />
-                  </label>
+                  {(form.photos || []).length < MAX_PHOTOS && (
+                    <label className="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-blue-400 hover:text-blue-500">
+                      <Camera className="w-5 h-5" /><span className="text-[10px] mt-1">Qo'shish</span>
+                      <input type="file" accept="image/*" capture="environment" multiple onChange={handlePhotoChange} className="hidden" />
+                    </label>
+                  )}
                 </div>
+                <p className="text-[11px] text-gray-400 mt-1.5">Ko'pi bilan {MAX_PHOTOS} ta rasm. Bir vaqtda bir nechtasini tanlash mumkin.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

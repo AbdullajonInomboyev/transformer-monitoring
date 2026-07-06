@@ -3,7 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { transformersApi, regionsApi, powerApi } from '@/api/client';
-import { Filter, Navigation, Search, GitBranch, Trash2, X, Plus } from 'lucide-react';
+import { Filter, Navigation, Search, GitBranch, Trash2, X, Plus, Crosshair } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+// Koordinata yaroqli ekanini tekshiruvchi yordamchi (NaN xatolarining oldini oladi)
+const isValidCoord = (lat: any, lng: any): boolean => {
+  const a = Number(lat), b = Number(lng);
+  return !isNaN(a) && !isNaN(b) && isFinite(a) && isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180;
+};
 
 // ============================================================
 // IKONLAR
@@ -157,11 +164,38 @@ export default function MapPage() {
 
   const handleMapClick = useCallback(async (lat: number, lng: number) => {
     if (mode !== 'add-pole') return;
+    if (!isValidCoord(lat, lng)) { toast.error('Koordinata yaroqsiz'); return; }
     try {
       const res = await powerApi.createPole({ latitude: lat, longitude: lng });
       setPoles(prev => [...prev, res.data.data]);
-    } catch (err) { console.error(err); }
+      toast.success('Stalba qo\'shildi');
+    } catch (err: any) {
+      console.error(err);
+      const msg = err?.response?.data?.error || '';
+      // regionId ustuni bazada yo'q bo'lsa (migratsiya qilinmagan) — tushunarli xabar
+      if (err?.response?.status === 500 || /region/i.test(msg)) {
+        toast.error('Baza yangilanmagan. Deploy\'da "prisma db push" bajarilishi kerak.');
+      } else {
+        toast.error(msg || 'Stalba qo\'shishda xatolik');
+      }
+    }
   }, [mode]);
+
+  // GPS orqali hozirgi joylashuvga stalba qo'shish (dala ishida qulay)
+  const addPoleAtMyLocation = useCallback(() => {
+    if (!navigator.geolocation) { toast.error('Qurilma GPS\'ni qo\'llab-quvvatlamaydi'); return; }
+    const loading = toast.loading('Joylashuv aniqlanmoqda...');
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        toast.dismiss(loading);
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        if (!isValidCoord(lat, lng)) { toast.error('GPS koordinatasi yaroqsiz'); return; }
+        await handleMapClick(lat, lng);
+      },
+      () => { toast.dismiss(loading); toast.error('Joylashuvga ruxsat berilmadi'); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [handleMapClick]);
 
   const handleNodeClick = useCallback((type: 'transformer' | 'pole', id: string) => {
     if (mode !== 'draw-line') return;
@@ -175,7 +209,12 @@ export default function MapPage() {
     powerApi.createLine(payload).then(res => {
       setLines(prev => [...prev, res.data.data]);
       setLineStart(null);
-    }).catch(console.error);
+      toast.success('Liniya qo\'shildi');
+    }).catch((err) => {
+      console.error(err);
+      toast.error(err?.response?.data?.error || 'Liniya qo\'shishda xatolik');
+      setLineStart(null);
+    });
   }, [mode, lineStart, lineType]);
 
   const deletePole = useCallback(async (id: string) => {
@@ -185,7 +224,11 @@ export default function MapPage() {
       setPoles(prev => prev.filter(p => p.id !== id));
       setLines(prev => prev.filter(l => l.fromPoleId !== id && l.toPoleId !== id));
       setSelectedPole(null);
-    } catch (err) { console.error(err); }
+      toast.success('Stalba o\'chirildi');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.response?.data?.error || 'O\'chirishda xatolik');
+    }
   }, []);
 
   const deleteLine = useCallback(async (id: string) => {
@@ -202,7 +245,7 @@ export default function MapPage() {
     const to = line.toTransformerId
       ? getNodeCoords('transformer', line.toTransformerId, transformers, poles)
       : line.toPoleId ? getNodeCoords('pole', line.toPoleId, transformers, poles) : null;
-    return from && to ? [from, to] : null;
+    return from && to && isValidCoord(from[0], from[1]) && isValidCoord(to[0], to[1]) ? [from, to] : null;
   }, [transformers, poles]);
 
   const filtered = transformers.filter(t => {
@@ -250,7 +293,7 @@ export default function MapPage() {
         );
       })}
 
-      {showPolesLayer && poles.map(pole => (
+      {showPolesLayer && poles.filter(pole => isValidCoord(pole.latitude, pole.longitude)).map(pole => (
         <Marker key={pole.id} position={[pole.latitude, pole.longitude]}
           icon={poleIcon(selectedPole === pole.id || (mode === 'draw-line' && lineStart?.type === 'pole' && lineStart.id === pole.id))}
           eventHandlers={{
@@ -261,7 +304,7 @@ export default function MapPage() {
           }} />
       ))}
 
-      {filtered.map(t => (
+      {filtered.filter(t => isValidCoord(t.latitude, t.longitude)).map(t => (
         <Marker key={t.id} position={[t.latitude, t.longitude]} icon={transformerIcon(t.healthScore || 100)}
           eventHandlers={{
             click: () => {
@@ -336,7 +379,7 @@ export default function MapPage() {
         <div className="w-3 h-3 rounded-full bg-slate-500 border-2 border-white shadow flex-shrink-0" />
         <div>
           <div className="text-sm font-semibold text-gray-800">Stalba tanlandi</div>
-          <div className="text-xs text-gray-400">{pole.latitude.toFixed(5)}, {pole.longitude.toFixed(5)}</div>
+          <div className="text-xs text-gray-400">{isValidCoord(pole.latitude, pole.longitude) ? `${Number(pole.latitude).toFixed(5)}, ${Number(pole.longitude).toFixed(5)}` : 'Koordinata yaroqsiz'}</div>
         </div>
         <div className="w-px h-8 bg-gray-200" />
         <button
@@ -361,6 +404,11 @@ export default function MapPage() {
         <>
           <div className="w-3 h-3 rounded-full bg-slate-500 border-2 border-white shadow flex-shrink-0" />
           <span className="text-sm font-medium text-gray-700">Xaritaga bosing — stalba qo'shiladi</span>
+          <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+          <button onClick={addPoleAtMyLocation}
+            className="flex items-center gap-1.5 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-full hover:bg-emerald-700 font-medium flex-shrink-0">
+            <Crosshair className="w-3.5 h-3.5" /> Mening joyimga
+          </button>
         </>
       )}
       {mode === 'draw-line' && (
