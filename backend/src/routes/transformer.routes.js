@@ -16,7 +16,7 @@ router.use(authenticate, inspectorReadOnly, regionFilter);
 router.get('/', async (req, res, next) => {
   try {
     const { page, limit, skip } = paginate(req.query);
-    const { search, regionId, districtId, substationId, status, minKva, maxKva } = req.query;
+    const { search, regionId, districtId, substationId, status, minKva, maxKva, areaType, riskLevel, hasPhoto, sortBy, sortDir } = req.query;
 
     const where = { ...req.regionFilter };
 
@@ -26,21 +26,32 @@ router.get('/', async (req, res, next) => {
         { model: { contains: search, mode: 'insensitive' } },
         { address: { contains: search, mode: 'insensitive' } },
         { networkName: { contains: search, mode: 'insensitive' } },
+        { manufacturer: { contains: search, mode: 'insensitive' } },
       ];
     }
     if (regionId && req.user.role === 'ADMIN') where.regionId = regionId;
     if (districtId) where.districtId = districtId;
     if (substationId) where.substationId = substationId;
     if (status) where.status = status;
+    if (areaType) where.areaType = areaType;
+    if (riskLevel) where.riskLevel = riskLevel;
     if (minKva) where.capacityKva = { ...(where.capacityKva || {}), gte: parseInt(minKva) };
     if (maxKva) where.capacityKva = { ...(where.capacityKva || {}), lte: parseInt(maxKva) };
+    if (hasPhoto === 'true') where.photoUrl = { not: null };
+    if (hasPhoto === 'false') where.photoUrl = null;
+
+    // Sortlash (faqat ruxsat etilgan ustunlar)
+    const sortableFields = ['inventoryNumber', 'model', 'capacityKva', 'healthScore', 'status', 'createdAt'];
+    const orderBy = sortableFields.includes(sortBy)
+      ? { [sortBy]: sortDir === 'asc' ? 'asc' : 'desc' }
+      : { createdAt: 'desc' };
 
     const [transformers, total] = await Promise.all([
       prisma.transformer.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
           region: { select: { id: true, name: true, code: true } },
           district: { select: { id: true, name: true } },

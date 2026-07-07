@@ -2,9 +2,43 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { transformersApi, regionsApi, districtsApi, substationsApi } from '@/api/client';
 import { useAuthStore } from '@/context/authStore';
-import { ArrowLeft, MapPin, Upload, X, Image, Camera } from 'lucide-react';
+import { ArrowLeft, MapPin, X, Camera } from 'lucide-react';
 import MapPicker from '@/components/map/MapPicker';
-import api from '@/api/client';
+
+const MAX_PHOTOS = 5;
+
+const photoUrl = (url?: string) => {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('http')) return url;
+  const base = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
+  return base ? base + url : url;
+};
+
+// Rasmni siqib base64'ga o'giradi
+const fileToCompressedBase64 = (file: File, maxSize = 1200, quality = 0.75): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxSize || height > maxSize) {
+          if (width > height) { height = Math.round(height * maxSize / width); width = maxSize; }
+          else { width = Math.round(width * maxSize / height); height = maxSize; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(reader.result as string); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 export default function TransformerForm() {
   const { user } = useAuthStore();
@@ -17,9 +51,7 @@ export default function TransformerForm() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
 
   const [form, setForm] = useState({
     inventoryNumber: '', model: '', manufacturer: '', networkName: '',
@@ -52,38 +84,33 @@ export default function TransformerForm() {
         connectedHouseholds: t.connectedHouseholds||0, estimatedPopulation: t.estimatedPopulation||0,
         areaType: t.areaType||'ETK tasarrufidagi', status: t.status||'OPERATIONAL', healthScore: t.healthScore||95,
         notes: t.notes||'', photoUrl: t.photoUrl||'' });
-      if (t.photoUrl) {
-        const base = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
-        setPhotoPreview(t.photoUrl.startsWith('http') ? t.photoUrl : (base ? base + t.photoUrl : t.photoUrl));
-      }
+      const existing = Array.isArray(t.photos) && t.photos.length ? t.photos : (t.photoUrl ? [t.photoUrl] : []);
+      setPhotos(existing);
     } catch {} finally { setLoading(false); }
   };
 
   const update = (f: string, v: any) => setForm(p => ({ ...p, [f]: v }));
   const handleMapSelect = (lat: number, lng: number, addr?: string) => setForm(f => ({ ...f, latitude: lat, longitude: lng, address: addr || f.address }));
 
-  const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) { setPhotoFile(file); const r = new FileReader(); r.onload = () => setPhotoPreview(r.result as string); r.readAsDataURL(file); }
-  };
-  const removePhoto = () => { setPhotoPreview(null); setPhotoFile(null); update('photoUrl', ''); };
-
-  const uploadPhoto = async (): Promise<string> => {
-    if (!photoFile) return form.photoUrl;
-    setUploading(true);
+  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    const freeSlots = MAX_PHOTOS - photos.length;
+    if (freeSlots <= 0) { alert(`Ko'pi bilan ${MAX_PHOTOS} ta rasm`); return; }
+    const selected = files.slice(0, freeSlots);
     try {
-      const formData = new FormData(); formData.append('file', photoFile);
-      const res = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      return res.data.data.url;
-    } catch { return ''; } finally { setUploading(false); }
+      const base64List = await Promise.all(selected.map(f => fileToCompressedBase64(f)));
+      setPhotos(prev => [...prev, ...base64List]);
+    } catch { alert("Rasmni o'qishda xatolik"); }
   };
+  const removePhoto = (idx: number) => setPhotos(prev => prev.filter((_, i) => i !== idx));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true);
     try {
-      let photoUrl = form.photoUrl;
-      if (photoFile) photoUrl = await uploadPhoto();
-      const data = { ...form, photoUrl, capacityKva: Number(form.capacityKva), manufactureYear: Number(form.manufactureYear),
+      const data = { ...form, photoUrl: photos[0] || '', photos,
+        capacityKva: Number(form.capacityKva), manufactureYear: Number(form.manufactureYear),
         connectedHouseholds: Number(form.connectedHouseholds), estimatedPopulation: Number(form.estimatedPopulation),
         healthScore: Number(form.healthScore), latitude: Number(form.latitude), longitude: Number(form.longitude) };
       if (isEdit) await transformersApi.update(id!, data);
@@ -129,26 +156,30 @@ export default function TransformerForm() {
           </button>
         </Sec>
 
-        <Sec n={3} t="Transformator Surati">
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
-            {photoPreview ? (
-              <div className="relative inline-block">
-                <img src={photoPreview} alt="Preview" className="max-h-48 rounded-lg mx-auto" />
-                <button type="button" onClick={removePhoto} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"><X className="w-3 h-3" /></button>
-              </div>
-            ) : (
-              <div><Image className="w-10 h-10 text-gray-300 mx-auto mb-2" /><p className="text-sm font-medium text-gray-700">Rasmni tashlang yoki tanlang</p><p className="text-xs text-gray-500 mt-1">PNG, JPG, WEBP — galereyadan yoki kameradan</p></div>
-            )}
-            <div className="flex items-center justify-center gap-3 mt-3">
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border rounded-lg text-sm cursor-pointer hover:bg-gray-50">
-                <Upload className="w-4 h-4" /> Galereyadan
-                <input type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
-              </label>
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border rounded-lg text-sm cursor-pointer hover:bg-gray-50">
-                <Camera className="w-4 h-4" /> Kameradan
-                <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
-              </label>
+        <Sec n={3} t="Transformator Suratlari">
+          <div className="border-2 border-dashed border-gray-300 rounded-xl p-4">
+            <div className="flex flex-wrap gap-3 mb-3">
+              {photos.map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={photoUrl(src)} alt={`rasm ${i+1}`} className="w-24 h-24 rounded-lg object-cover border" />
+                  <button type="button" onClick={() => removePhoto(i)} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"><X className="w-3 h-3" /></button>
+                  {i === 0 && <span className="absolute bottom-1 left-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded">Asosiy</span>}
+                </div>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <div className="flex flex-col gap-1">
+                  <label className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-blue-400 hover:text-blue-500">
+                    <Camera className="w-6 h-6" /><span className="text-[10px] mt-1">Galereya</span>
+                    <input type="file" accept="image/*" multiple onChange={handlePhoto} className="hidden" />
+                  </label>
+                  <label className="text-[10px] text-center text-blue-500 cursor-pointer hover:underline">
+                    Kamera
+                    <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+                  </label>
+                </div>
+              )}
             </div>
+            <p className="text-xs text-gray-500">Ko'pi bilan {MAX_PHOTOS} ta rasm ({photos.length}/{MAX_PHOTOS}). Birinchi rasm asosiy hisoblanadi. "Galereya" orqali bir martada bir nechta rasm tanlash mumkin.</p>
           </div>
         </Sec>
 
@@ -180,8 +211,8 @@ export default function TransformerForm() {
 
         <div className="flex items-center gap-3 justify-end pt-4 border-t">
           <button type="button" onClick={()=>navigate(-1)} className="px-6 py-2.5 border rounded-xl text-sm">Bekor</button>
-          <button type="submit" disabled={saving || uploading} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-            {uploading ? 'Rasm yuklanmoqda...' : saving ? 'Saqlanmoqda...' : isEdit ? 'Saqlash' : 'Yaratish'}
+          <button type="submit" disabled={saving} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+            {saving ? 'Saqlanmoqda...' : isEdit ? 'Saqlash' : 'Yaratish'}
           </button>
         </div>
       </form>

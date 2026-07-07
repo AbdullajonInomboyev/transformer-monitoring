@@ -172,10 +172,6 @@ export default function Layout() {
               </button>
             )}
             <h1 className="text-base md:text-lg font-semibold text-gray-800 truncate">Transformator Info</h1>
-            <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full flex items-center gap-1 flex-shrink-0">
-              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-              <span className="hidden sm:inline">Oflayn</span>
-            </span>
           </div>
 
           <div className="flex items-center gap-1 md:gap-3">

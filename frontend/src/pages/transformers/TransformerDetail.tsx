@@ -44,7 +44,9 @@ export default function TransformerDetail() {
   if (!data) return null;
 
   const statusCls: Record<string, string> = { OPERATIONAL: 'badge-operational', WARNING: 'badge-warning', CRITICAL: 'badge-critical', OFFLINE: 'badge-offline' };
+  const statusLabel: Record<string, string> = { OPERATIONAL: 'Ishlayapti', WARNING: 'Ogohlantirish', CRITICAL: 'Kritik', OFFLINE: "O'chgan" };
   const riskCls: Record<string, string> = { LOW: 'text-emerald-600', MEDIUM: 'text-amber-600', HIGH: 'text-red-500', CRITICAL: 'text-red-700' };
+  const riskLabel: Record<string, string> = { LOW: 'Past', MEDIUM: "O'rta", HIGH: 'Yuqori', CRITICAL: 'Kritik' };
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -53,7 +55,7 @@ export default function TransformerDetail() {
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/transformers')} className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft className="w-5 h-5" /></button>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">{data.inventoryNumber} <span className={`text-sm px-2 py-0.5 rounded-full ${statusCls[data.status]}`}>{data.status}</span></h1>
+            <h1 className="text-2xl font-bold flex items-center gap-2">{data.inventoryNumber} <span className={`text-sm px-2 py-0.5 rounded-full ${statusCls[data.status]}`}>{statusLabel[data.status] || data.status}</span></h1>
             <p className="text-sm text-gray-500">{data.model} • {data.manufacturer || 'Noma\'lum ishlab chiqaruvchi'}</p>
           </div>
         </div>
@@ -72,7 +74,7 @@ export default function TransformerDetail() {
             <MiniCard icon={Zap} label="Quvvat" value={`${data.capacityKva} kVA`} color="blue" />
             <MiniCard icon={Activity} label="Salomatlik" value={`${data.healthScore}%`} color={data.healthScore > 70 ? 'emerald' : data.healthScore > 40 ? 'amber' : 'red'} />
             <MiniCard icon={Users} label="Xonadonlar" value={data.connectedHouseholds} color="purple" />
-            <MiniCard icon={AlertTriangle} label="Risk" value={data.riskLevel} color={data.riskLevel === 'LOW' ? 'emerald' : 'red'} />
+            <MiniCard icon={AlertTriangle} label="Risk darajasi" value={riskLabel[data.riskLevel] || data.riskLevel} color={data.riskLevel === 'LOW' ? 'emerald' : 'red'} />
           </div>
 
           {/* Transformator rasmi */}
@@ -202,8 +204,8 @@ export default function TransformerDetail() {
                 <div className="flex justify-between text-sm mb-1"><span className="text-gray-500">Salomatlik</span><span className={`font-bold ${data.healthScore > 70 ? 'text-emerald-600' : 'text-red-600'}`}>{data.healthScore}%</span></div>
                 <div className="h-2 bg-gray-100 rounded-full"><div className={`h-2 rounded-full ${data.healthScore > 70 ? 'bg-emerald-500' : data.healthScore > 40 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${data.healthScore}%` }} /></div>
               </div>
-              <div className="flex justify-between text-sm"><span className="text-gray-500">Risk darajasi</span><span className={`font-medium ${riskCls[data.riskLevel]}`}>{data.riskLevel}</span></div>
-              <div className="flex items-center gap-2 text-sm border-t pt-4"><span className={`w-2 h-2 rounded-full ${data.status === 'OPERATIONAL' ? 'bg-emerald-500' : data.status === 'CRITICAL' ? 'bg-red-500' : 'bg-amber-500'}`} /><span className="text-gray-500">Holat</span><span className="ml-auto font-medium">{data.status}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Risk darajasi</span><span className={`font-medium ${riskCls[data.riskLevel]}`}>{riskLabel[data.riskLevel] || data.riskLevel}</span></div>
+              <div className="flex items-center gap-2 text-sm border-t pt-4"><span className={`w-2 h-2 rounded-full ${data.status === 'OPERATIONAL' ? 'bg-emerald-500' : data.status === 'CRITICAL' ? 'bg-red-500' : 'bg-amber-500'}`} /><span className="text-gray-500">Holat</span><span className="ml-auto font-medium">{statusLabel[data.status] || data.status}</span></div>
 
               {/* Statistika */}
               {data._count && (
