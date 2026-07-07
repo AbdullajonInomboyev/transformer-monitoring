@@ -49,7 +49,7 @@ const STATUS_CLS: Record<string, string> = {
   BROKEN: 'bg-red-100 text-red-700',
   REPLACED: 'bg-amber-100 text-amber-700',
 };
-const TYPE_LABELS: Record<string, string> = { SINGLE_PHASE: 'Bir fazali', THREE_PHASE: 'Uch fazali' };
+const TYPE_LABELS: Record<string, string> = { SINGLE_PHASE: 'Bir fazali', THREE_PHASE: 'Uch fazali', BALANCE: 'Balans hisoblagich' };
 
 const emptyForm = {
   meterNumber: '', transformerId: '', ownerName: '', address: '', phone: '',
@@ -423,13 +423,19 @@ export default function MetersPage() {
                     </div>
                   ))}
                   {(form.photos || []).length < MAX_PHOTOS && (
-                    <label className="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-blue-400 hover:text-blue-500">
-                      <Camera className="w-5 h-5" /><span className="text-[10px] mt-1">Qo'shish</span>
-                      <input type="file" accept="image/*" capture="environment" multiple onChange={handlePhotoChange} className="hidden" />
-                    </label>
+                    <div className="flex flex-col gap-1">
+                      <label className="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-blue-400 hover:text-blue-500">
+                        <Camera className="w-5 h-5" /><span className="text-[10px] mt-1">Galereya</span>
+                        <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="hidden" />
+                      </label>
+                      <label className="text-[10px] text-center text-blue-500 cursor-pointer hover:underline">
+                        Kamera
+                        <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
+                      </label>
+                    </div>
                   )}
                 </div>
-                <p className="text-[11px] text-gray-400 mt-1.5">Ko'pi bilan {MAX_PHOTOS} ta rasm. Bir vaqtda bir nechtasini tanlash mumkin.</p>
+                <p className="text-[11px] text-gray-400 mt-1.5">Ko'pi bilan {MAX_PHOTOS} ta rasm. "Galereya" orqali bir martada bir nechta rasm tanlash mumkin.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

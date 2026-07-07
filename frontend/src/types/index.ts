@@ -136,7 +136,7 @@ export interface PaginatedResponse<T> {
 export interface SelectOption { id: string; name: string; code?: string; }
 
 // ============ METER TYPES ============
-export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE';
+export type MeterType = 'SINGLE_PHASE' | 'THREE_PHASE' | 'BALANCE';
 export type MeterStatus = 'ACTIVE' | 'INACTIVE' | 'BROKEN' | 'REPLACED';
 
 export interface Meter {

@@ -457,6 +457,7 @@ model PowerLine {
 enum MeterType {
   SINGLE_PHASE // Bir fazali
   THREE_PHASE  // Uch fazali
+  BALANCE      // Balans hisoblagich
 }
 
 enum MeterStatus {

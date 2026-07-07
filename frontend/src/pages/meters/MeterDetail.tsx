@@ -20,7 +20,7 @@ const STATUS_CLS: Record<string, string> = {
   BROKEN: 'bg-red-100 text-red-700',
   REPLACED: 'bg-amber-100 text-amber-700',
 };
-const TYPE_LABELS: Record<string, string> = { SINGLE_PHASE: 'Bir fazali', THREE_PHASE: 'Uch fazali' };
+const TYPE_LABELS: Record<string, string> = { SINGLE_PHASE: 'Bir fazali', THREE_PHASE: 'Uch fazali', BALANCE: 'Balans hisoblagich' };
 
 export default function MeterDetail() {
   const { id } = useParams();

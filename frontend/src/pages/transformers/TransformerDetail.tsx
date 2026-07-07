@@ -4,7 +4,7 @@ import { transformersApi, metersApi } from '@/api/client';
 import { useAuthStore } from '@/context/authStore';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
-import { ArrowLeft, Edit, MapPin, Zap, Users, Activity, AlertTriangle, Wrench, Calendar, Building2, Gauge, Plus } from 'lucide-react';
+import { ArrowLeft, Edit, MapPin, Zap, Users, Activity, AlertTriangle, Wrench, Gauge, Plus } from 'lucide-react';
 
 const markerIcon = L.divIcon({
   className: '',
@@ -189,42 +189,31 @@ export default function TransformerDetail() {
           )}
         </div>
 
-        {/* Right column - Live Preview */}
+        {/* Right column - Statistika */}
         <div className="space-y-4">
           <div className="bg-white rounded-xl border p-6 sticky top-6">
-            <h3 className="font-semibold mb-4">Live Preview</h3>
+            <h3 className="font-semibold mb-4">Umumiy holat</h3>
             <div className="space-y-4">
-              <PreviewItem icon={Zap} label="Transformer ID" value={data.inventoryNumber} />
-              <PreviewItem icon={MapPin} label="Location" value={data.address || `${data.latitude?.toFixed(4)}, ${data.longitude?.toFixed(4)}`} color="red" />
-              <PreviewItem icon={Users} label="Connected Households" value={`${data.connectedHouseholds} households`} />
-
-              <div className="border-t pt-4">
-                <div className="flex justify-between text-sm"><span className="text-gray-500">Capacity</span><span className="font-bold">{data.capacityKva} kVA</span></div>
-              </div>
               <div>
-                <div className="flex justify-between text-sm mb-1"><span className="text-gray-500">Load</span><span>{data.loadPercent || 0}%</span></div>
+                <div className="flex justify-between text-sm mb-1"><span className="text-gray-500">Yuklama</span><span className="font-medium">{data.loadPercent || 0}%</span></div>
                 <div className="h-2 bg-gray-100 rounded-full"><div className="h-2 bg-blue-500 rounded-full" style={{ width: `${data.loadPercent || 0}%` }} /></div>
               </div>
               <div>
-                <div className="flex justify-between text-sm"><span className="text-gray-500">Capacity per Household</span><span>{data.connectedHouseholds ? Math.round(data.capacityKva / data.connectedHouseholds * 100) / 100 : 0} kVA</span></div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1"><span className="text-gray-500">Health Score</span><span className={`font-bold ${data.healthScore > 70 ? 'text-emerald-600' : 'text-red-600'}`}>{data.healthScore}%</span></div>
+                <div className="flex justify-between text-sm mb-1"><span className="text-gray-500">Salomatlik</span><span className={`font-bold ${data.healthScore > 70 ? 'text-emerald-600' : 'text-red-600'}`}>{data.healthScore}%</span></div>
                 <div className="h-2 bg-gray-100 rounded-full"><div className={`h-2 rounded-full ${data.healthScore > 70 ? 'bg-emerald-500' : data.healthScore > 40 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${data.healthScore}%` }} /></div>
               </div>
-              <div className="flex justify-between text-sm"><span className="text-gray-500">Risk Level</span><span className={`font-medium ${riskCls[data.riskLevel]}`}>{data.riskLevel}</span></div>
-              <div className="border-t pt-4">
-                <div className="flex items-center gap-2 text-sm"><span className={`w-2 h-2 rounded-full ${data.status === 'OPERATIONAL' ? 'bg-emerald-500' : data.status === 'CRITICAL' ? 'bg-red-500' : 'bg-amber-500'}`} /><span>Status</span><span className="ml-auto font-medium">{data.status}</span></div>
-              </div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Risk darajasi</span><span className={`font-medium ${riskCls[data.riskLevel]}`}>{data.riskLevel}</span></div>
+              <div className="flex items-center gap-2 text-sm border-t pt-4"><span className={`w-2 h-2 rounded-full ${data.status === 'OPERATIONAL' ? 'bg-emerald-500' : data.status === 'CRITICAL' ? 'bg-red-500' : 'bg-amber-500'}`} /><span className="text-gray-500">Holat</span><span className="ml-auto font-medium">{data.status}</span></div>
 
               {/* Statistika */}
               {data._count && (
                 <div className="border-t pt-4 grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-blue-50 rounded-lg p-2 text-center"><div className="font-bold text-lg text-blue-700">{data._count.meters ?? meters.length}</div>Hisoblagichlar</div>
-                  <div className="bg-gray-50 rounded-lg p-2 text-center"><div className="font-bold text-lg">{data._count.alerts}</div>Alertlar</div>
-                  <div className="bg-gray-50 rounded-lg p-2 text-center"><div className="font-bold text-lg">{data._count.maintenance}</div>Xizmatlar</div>
-                  <div className="bg-gray-50 rounded-lg p-2 text-center"><div className="font-bold text-lg">{data._count.inspections}</div>Tekshiruvlar</div>
-                  <div className="bg-gray-50 rounded-lg p-2 text-center"><div className="font-bold text-lg">{data._count.incidents}</div>Hodisalar</div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center"><div className="font-bold text-lg text-blue-700">{data._count.meters ?? meters.length}</div>Hisoblagichlar</div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center"><div className="font-bold text-lg">{data._count.alerts}</div>Ogohlantirishlar</div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center"><div className="font-bold text-lg">{data._count.maintenance}</div>Xizmatlar</div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center"><div className="font-bold text-lg">{data._count.inspections}</div>Tekshiruvlar</div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center"><div className="font-bold text-lg">{data._count.incidents}</div>Hodisalar</div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center"><div className="font-bold text-lg">{data._count.workOrders ?? 0}</div>Buyurtmalar</div>
                 </div>
               )}
             </div>
@@ -247,10 +236,4 @@ function MiniCard({ icon: Icon, label, value, color }: any) {
 
 function Info({ label, value }: { label: string; value: any }) {
   return (<div><span className="text-gray-500">{label}</span><div className="font-medium mt-0.5">{value || '—'}</div></div>);
-}
-
-function PreviewItem({ icon: Icon, label, value, color = 'blue' }: any) {
-  return (
-    <div className="flex items-start gap-3"><Icon className={`w-4 h-4 mt-0.5 text-${color}-500`} /><div><div className="text-xs text-gray-500">{label}</div><div className="text-sm font-medium">{value || '—'}</div></div></div>
-  );
 }

@@ -135,7 +135,7 @@ const createMeterSchema = z.object({
   ownerName: z.string().min(2, 'Egasining ismi kamida 2 ta belgi'),
   address: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
-  meterType: z.enum(['SINGLE_PHASE', 'THREE_PHASE']).optional(),
+  meterType: z.enum(['SINGLE_PHASE', 'THREE_PHASE', 'BALANCE']).optional(),
   meterModel: z.string().optional().nullable(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'BROKEN', 'REPLACED']).optional(),
   sealNumber: z.string().optional().nullable(),
